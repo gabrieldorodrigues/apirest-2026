@@ -3,11 +3,15 @@ package com.example.musica.service;
 import java.util.HashSet;
 import java.util.Set;
 
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.example.musica.config.CacheConfig;
 import com.example.musica.dto.AlbumRequestDto;
 import com.example.musica.dto.AlbumResponseDto;
 import com.example.musica.exception.ConflitoException;
@@ -40,6 +44,9 @@ public class AlbumService {
         this.albumMapper = albumMapper;
     }
 
+    // a chave junta filtros, página, tamanho e ordenação: cada combinação é uma entrada no cache
+    @Cacheable(cacheNames = CacheConfig.ALBUNS,
+            key = "T(com.example.musica.service.AlbumService).chaveListagem(#titulo, #ano, #artistaId, #generoId, #pageable)")
     @Transactional(readOnly = true)
     public Page<AlbumResponseDto> listar(String titulo, Integer ano, Long artistaId, Long generoId,
             Pageable pageable) {
@@ -47,11 +54,15 @@ public class AlbumService {
                 .map(this::toDto);
     }
 
+    // álbum inexistente lança 404 antes de guardar, então o erro não fica no cache
+    @Cacheable(cacheNames = CacheConfig.ALBUM, key = "#id")
     @Transactional(readOnly = true)
     public AlbumResponseDto buscar(Long id) {
         return toDto(buscarEntidade(id));
     }
 
+    // álbum novo pode entrar em qualquer página da listagem
+    @CacheEvict(cacheNames = CacheConfig.ALBUNS, allEntries = true)
     @Transactional
     public AlbumResponseDto criar(AlbumRequestDto dto) {
         Album album = new Album();
@@ -59,6 +70,9 @@ public class AlbumService {
         return toDto(albumRepository.save(album));
     }
 
+    @Caching(evict = {
+            @CacheEvict(cacheNames = CacheConfig.ALBUM, key = "#id"),
+            @CacheEvict(cacheNames = CacheConfig.ALBUNS, allEntries = true) })
     @Transactional
     public AlbumResponseDto atualizar(Long id, AlbumRequestDto dto) {
         Album album = buscarEntidade(id);
@@ -66,6 +80,9 @@ public class AlbumService {
         return toDto(albumRepository.save(album));
     }
 
+    @Caching(evict = {
+            @CacheEvict(cacheNames = CacheConfig.ALBUM, key = "#id"),
+            @CacheEvict(cacheNames = CacheConfig.ALBUNS, allEntries = true) })
     @Transactional
     public void remover(Long id) {
         Album album = buscarEntidade(id);
@@ -76,6 +93,20 @@ public class AlbumService {
             throw new ConflitoException("Não é possível remover um álbum que possui avaliações");
         }
         albumRepository.delete(album);
+    }
+
+    // chamado pelo AvaliacaoService quando uma avaliação muda a nota média do álbum; não tem corpo porque
+    // o trabalho todo é das anotações (o evict roda depois do commit da transação de quem chamou)
+    @Caching(evict = {
+            @CacheEvict(cacheNames = CacheConfig.ALBUM, key = "#albumId"),
+            @CacheEvict(cacheNames = CacheConfig.ALBUNS, allEntries = true) })
+    public void invalidarCache(Long albumId) {
+    }
+
+    // fica legível no Redis: albuns::titulo=null;ano=null;artistaId=1;generoId=2;page=0;size=10;sort=titulo: ASC
+    public static String chaveListagem(String titulo, Integer ano, Long artistaId, Long generoId, Pageable pageable) {
+        return "titulo=" + titulo + ";ano=" + ano + ";artistaId=" + artistaId + ";generoId=" + generoId
+                + ";page=" + pageable.getPageNumber() + ";size=" + pageable.getPageSize() + ";sort=" + pageable.getSort();
     }
 
     Album buscarEntidade(Long id) {

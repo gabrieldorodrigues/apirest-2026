@@ -1,10 +1,12 @@
 package com.example.musica.service;
 
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.example.musica.config.CacheConfig;
 import com.example.musica.dto.GeneroRequestDto;
 import com.example.musica.dto.GeneroResponseDto;
 import com.example.musica.exception.ConflitoException;
@@ -48,6 +50,8 @@ public class GeneroService {
         return generoMapper.toDto(generoRepository.save(genero));
     }
 
+    // o nome do gênero vai dentro da resposta de cada álbum, então todos os álbuns em cache ficam velhos
+    @CacheEvict(cacheNames = { CacheConfig.ALBUM, CacheConfig.ALBUNS }, allEntries = true)
     @Transactional
     public GeneroResponseDto atualizar(Long id, GeneroRequestDto dto) {
         Genero genero = buscarEntidade(id);
