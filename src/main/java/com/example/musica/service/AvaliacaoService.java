@@ -2,6 +2,8 @@ package com.example.musica.service;
 
 import java.math.BigDecimal;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -16,9 +18,14 @@ import com.example.musica.mapper.AvaliacaoMapper;
 import com.example.musica.model.Avaliacao;
 import com.example.musica.repository.AvaliacaoRepository;
 
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.Gauge;
+import io.micrometer.core.instrument.MeterRegistry;
+
 @Service
 public class AvaliacaoService {
 
+    private static final Logger log = LoggerFactory.getLogger(AvaliacaoService.class);
     private static final BigDecimal MEIO = new BigDecimal("0.5");
 
     private final AvaliacaoRepository avaliacaoRepository;
@@ -26,14 +33,22 @@ public class AvaliacaoService {
     private final AlbumService albumService;
     private final MusicaService musicaService;
     private final AvaliacaoMapper avaliacaoMapper;
+    private final MeterRegistry meterRegistry;
 
     public AvaliacaoService(AvaliacaoRepository avaliacaoRepository, UsuarioService usuarioService,
-            AlbumService albumService, MusicaService musicaService, AvaliacaoMapper avaliacaoMapper) {
+            AlbumService albumService, MusicaService musicaService, AvaliacaoMapper avaliacaoMapper,
+            MeterRegistry meterRegistry) {
         this.avaliacaoRepository = avaliacaoRepository;
         this.usuarioService = usuarioService;
         this.albumService = albumService;
         this.musicaService = musicaService;
         this.avaliacaoMapper = avaliacaoMapper;
+        this.meterRegistry = meterRegistry;
+
+        // lido do banco a cada consulta em /actuator/metrics/musica.avaliacoes.total
+        Gauge.builder("musica.avaliacoes.total", avaliacaoRepository, AvaliacaoRepository::count)
+                .description("Total de avaliações cadastradas")
+                .register(meterRegistry);
     }
 
     @Transactional(readOnly = true)
@@ -53,7 +68,17 @@ public class AvaliacaoService {
         validarRegras(dto, null);
         Avaliacao avaliacao = new Avaliacao();
         copiar(dto, avaliacao);
-        return avaliacaoMapper.toDto(avaliacaoRepository.save(avaliacao));
+        Avaliacao salva = avaliacaoRepository.save(avaliacao);
+
+        String tipo = salva.getAlbum() != null ? "album" : "musica";
+        Counter.builder("musica.avaliacoes.criadas")
+                .description("Avaliações criadas desde que a API subiu")
+                .tag("tipo", tipo)
+                .register(meterRegistry)
+                .increment();
+        log.info("Avaliação {} criada: usuário {} avaliou {} {} com nota {}", salva.getId(), dto.usuarioId(), tipo,
+                tipo.equals("album") ? dto.albumId() : dto.musicaId(), dto.nota());
+        return avaliacaoMapper.toDto(salva);
     }
 
     @Transactional
@@ -62,12 +87,15 @@ public class AvaliacaoService {
         validarRegras(dto, id);
         copiar(dto, avaliacao);
         // flush força o @PreUpdate a rodar agora, senão a resposta voltaria com o atualizadaEm antigo
-        return avaliacaoMapper.toDto(avaliacaoRepository.saveAndFlush(avaliacao));
+        AvaliacaoResponseDto resposta = avaliacaoMapper.toDto(avaliacaoRepository.saveAndFlush(avaliacao));
+        log.info("Avaliação {} atualizada: nota {}", id, dto.nota());
+        return resposta;
     }
 
     @Transactional
     public void remover(Long id) {
         avaliacaoRepository.delete(buscarEntidade(id));
+        log.info("Avaliação {} removida", id);
     }
 
     private Avaliacao buscarEntidade(Long id) {
@@ -81,9 +109,12 @@ public class AvaliacaoService {
         boolean temMusica = dto.musicaId() != null;
         // iguais = vieram os dois ou nenhum
         if (temAlbum == temMusica) {
+            log.warn("Avaliação recusada (422): usuário {} informou álbum {} e música {}", dto.usuarioId(),
+                    dto.albumId(), dto.musicaId());
             throw new RegraNegocioException("A avaliação deve ser de um álbum ou de uma música, nunca dos dois");
         }
         if (dto.nota().remainder(MEIO).compareTo(BigDecimal.ZERO) != 0) {
+            log.warn("Avaliação recusada (422): nota {} fora do passo de 0.5", dto.nota());
             throw new RegraNegocioException("A nota deve ser em passos de 0.5 (ex.: 3.0, 3.5, 4.0)");
         }
 
@@ -98,6 +129,8 @@ public class AvaliacaoService {
                     : avaliacaoRepository.existsByUsuarioIdAndMusicaIdAndIdNot(dto.usuarioId(), dto.musicaId(), id);
         }
         if (jaAvaliou) {
+            log.warn("Avaliação recusada (409): usuário {} já avaliou {} {}", dto.usuarioId(),
+                    temAlbum ? "o álbum" : "a música", temAlbum ? dto.albumId() : dto.musicaId());
             throw new ConflitoException("Este usuário já avaliou " + (temAlbum ? "este álbum" : "esta música"));
         }
     }
