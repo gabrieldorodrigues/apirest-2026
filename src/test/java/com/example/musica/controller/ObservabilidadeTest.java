@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasItem;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -40,6 +41,19 @@ class ObservabilidadeTest extends ApiTestBase {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.app.nome").value("API de Avaliação Musical"))
                 .andExpect(jsonPath("$.java.version").isNotEmpty());
+    }
+
+    @Test
+    @DisplayName("Toda resposta traz o header X-Instancia, o mesmo id mostrado no /actuator/info")
+    void identificaInstancia() throws Exception {
+        String instancia = mockMvc.perform(get("/albuns"))
+                .andExpect(status().isOk())
+                .andExpect(header().exists("X-Instancia"))
+                .andReturn().getResponse().getHeader("X-Instancia");
+
+        mockMvc.perform(get("/actuator/info"))
+                .andExpect(jsonPath("$.instancia.id").value(instancia))
+                .andExpect(jsonPath("$.instancia.iniciadaEm").isNotEmpty());
     }
 
     @Test
