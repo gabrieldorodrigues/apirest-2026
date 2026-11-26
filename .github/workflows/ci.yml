@@ -1,0 +1,107 @@
+# Compila e testa a API em todo pull request e push na main.
+# Na main, depois dos testes, também gera a imagem Docker e publica no GitHub Container Registry.
+name: CI
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "docs/**"
+      - "evidencias/**"
+      - "mkdocs.yml"
+      - "mkdocs-hooks/**"
+      - "requirements-docs.txt"
+      - ".github/workflows/docs.yml"
+      - "**.md"
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  # em PR, um push novo cancela a execução anterior; na main cada commit gera a sua imagem
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  testes:
+    name: Testes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+
+      # o runner tem Docker, então o PostgresIntegracaoTest (Testcontainers) roda de verdade
+      - name: Compilar e rodar os testes
+        run: ./mvnw -B verify
+
+      - name: Resumo dos testes
+        if: always()
+        run: |
+          python3 - <<'EOF' >> "$GITHUB_STEP_SUMMARY"
+          import glob, xml.etree.ElementTree as ET
+          print("| Classe | Testes | Falhas | Pulados |")
+          print("| --- | --- | --- | --- |")
+          total = [0, 0, 0]
+          for arquivo in sorted(glob.glob("target/surefire-reports/TEST-*.xml")):
+              s = ET.parse(arquivo).getroot()
+              n, f, p = int(s.get("tests")), int(s.get("failures")) + int(s.get("errors")), int(s.get("skipped"))
+              total = [total[0] + n, total[1] + f, total[2] + p]
+              print(f"| `{s.get('name').split('.')[-1]}` | {n} | {f} | {p} |")
+          print(f"| **Total** | **{total[0]}** | **{total[1]}** | **{total[2]}** |")
+          EOF
+
+      - name: Salvar relatório dos testes
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: relatorio-testes
+          path: target/surefire-reports/
+
+  imagem:
+    name: Imagem Docker
+    needs: testes
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    env:
+      PUBLICAR: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Entrar no GitHub Container Registry
+        if: env.PUBLICAR == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Definir tags
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,format=long,prefix=
+
+      # em PR só gera a imagem, para garantir que o Dockerfile continua funcionando
+      - name: Gerar e publicar a imagem
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: ${{ env.PUBLICAR == 'true' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
