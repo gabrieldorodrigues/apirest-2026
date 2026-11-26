@@ -26,7 +26,7 @@ flowchart LR
 | `dto` | Records de entrada (`*RequestDto`, com Bean Validation) e de saída (`*ResponseDto`). |
 | `mapper` | Conversão de entidade para DTO. |
 | `exception` | Exceções de domínio e o `ApiExceptionHandler`, que transforma tudo em Problem Details (RFC 9457). |
-| `config` | `SeedConfig` (dados de exemplo), `OpenApiConfig` (Swagger), `RequestLoggingFilter` (log das requisições) e `InstanciaFilter` (header `X-Instancia`). |
+| `config` | `SeedConfig` (dados de exemplo), `OpenApiConfig` (Swagger), `CorsConfig` (origens liberadas), `RequestLoggingFilter` (log das requisições) e `InstanciaFilter` (header `X-Instancia`). |
 
 ```text
 src/main/java/com/example/musica

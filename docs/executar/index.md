@@ -35,6 +35,7 @@ Em todos os casos a API responde em `http://localhost:8080`:
 | Endereço | O que é |
 | --- | --- |
 | `http://localhost:8080/swagger-ui.html` | Swagger UI para testar os endpoints pelo navegador |
+| [Swagger UI do site](/apirest-2026/swagger/) | A mesma Swagger UI publicada no GitHub Pages; o **Try it out** chama a API local |
 | `http://localhost:8080/actuator/health` | Situação da API e do banco |
 | `http://localhost:8080/albuns` | Exemplo de listagem |
 

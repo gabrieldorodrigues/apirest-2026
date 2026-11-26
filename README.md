@@ -253,7 +253,7 @@ O código segue a arquitetura em camadas: o controller recebe a requisição, o 
 
 ```text
 src/main/java/com/example/musica
-├── config        # SeedConfig com os dados iniciais, OpenApiConfig (Swagger), RequestLoggingFilter (log das requisições) e InstanciaFilter (header X-Instancia)
+├── config        # SeedConfig com os dados iniciais, OpenApiConfig (Swagger), CorsConfig (origens liberadas), RequestLoggingFilter (log das requisições) e InstanciaFilter (header X-Instancia)
 ├── controller    # endpoints REST
 ├── dto           # records de entrada (RequestDto) e saída (ResponseDto)
 ├── exception     # exceções e ApiExceptionHandler
@@ -454,6 +454,8 @@ A documentação é gerada automaticamente pelo **springdoc-openapi** a partir d
 | `http://localhost:8080/swagger-ui.html` | Swagger UI: lista todos os endpoints e permite testá-los pelo navegador (**Try it out**) |
 | `http://localhost:8080/v3/api-docs` | Especificação OpenAPI 3 em JSON, que pode ser importada no Postman ou em outras ferramentas |
 
+A Swagger UI também está publicada no GitHub Pages, sem precisar rodar nada: **[gabrieldorodrigues.github.io/apirest-2026/swagger/](https://gabrieldorodrigues.github.io/apirest-2026/swagger/)** (issue [#15](https://github.com/gabrieldorodrigues/apirest-2026/issues/15)). A especificação é gerada pelos testes a partir do código da `main`. O **Try it out** dessa página chama a API em `http://localhost:8080`, então suba a API antes. O `CorsConfig` libera o navegador a chamar a API a partir do domínio do Pages (`api.cors.origens`, variável `API_CORS_ORIGENS`).
+
 O que está documentado:
 
 - **Seções na ordem do domínio:** Artistas, Gêneros, Álbuns, Músicas, Usuários e Avaliações (`@Tag`);
@@ -463,7 +465,7 @@ O que está documentado:
 - **DTOs de entrada** com exemplos que usam os dados do seed (`@Schema`). O **Try it out** já abre com um corpo válido: em `POST /avaliacoes`, o exemplo cria a avaliação do João para o OK Computer (201), e executar de novo retorna 409;
 - **Validações** (`@NotNull`, `@Size`, `@DecimalMin`, `@DecimalMax`...) aparecem no schema como campos obrigatórios, mínimos e máximos.
 
-A configuração fica em `OpenApiConfig` (título, descrição, versão, ordem das seções e o schema de erro) e em `application.properties` (`springdoc.*`).
+A configuração fica em `OpenApiConfig` (título, descrição, versão, ordem das seções e o schema de erro), em `CorsConfig` (origens liberadas) e em `application.properties` (`springdoc.*` e `api.cors.origens`).
 
 Evidências: [15-swagger-ui](evidencias/15-swagger-ui.png) e [16-swagger-try-it-out](evidencias/16-swagger-try-it-out.png).
 
@@ -560,7 +562,7 @@ Evidências: [24-lb-compose-ps](evidencias/24-lb-compose-ps.png), [25-lb-balance
 
 > Requisito extra: **Testes automatizados (5%)**, issue [#5](https://github.com/gabrieldorodrigues/apirest-2026/issues/5).
 
-São 56 testes de integração com JUnit 5, `@SpringBootTest` e `MockMvc`. Cada teste faz uma requisição HTTP de verdade para a API e confere o status, o corpo e o formato Problem Details dos erros. Os testes não usam mocks: passam pelo controller, pelo service, pelo repository e pelo banco.
+São 59 testes de integração com JUnit 5, `@SpringBootTest` e `MockMvc`. Cada teste faz uma requisição HTTP de verdade para a API e confere o status, o corpo e o formato Problem Details dos erros. Os testes não usam mocks: passam pelo controller, pelo service, pelo repository e pelo banco.
 
 - O banco é um H2 **em memória** (`jdbc:h2:mem:api-teste`), separado do `./data` usado no dia a dia. A exceção é o `PostgresIntegracaoTest`, que usa um PostgreSQL de verdade;
 - O `SeedConfig` carrega os mesmos dados de exemplo, então os testes usam os álbuns, músicas e usuários do seed;
@@ -571,7 +573,7 @@ São 56 testes de integração com JUnit 5, `@SpringBootTest` e `MockMvc`. Cada 
 | `AvaliacaoControllerTest` | CRUD de avaliação; recálculo da `notaMedia`; 409 por avaliação repetida de álbum e de música; editar a própria avaliação não conta como repetida; 422 para álbum e música ao mesmo tempo, sem nenhum dos dois e nota fora do passo de 0,5; 400 para nota fora de 0,5 a 5 e campos obrigatórios; 404 para usuário inexistente; histórico por `usuarioId`; filtro `notaMinima` com ordenação |
 | `AlbumControllerTest` | CRUD de álbum; `notaMedia` calculada; 409 ao remover álbum com músicas; 404 em Problem Details; 404 para gênero inexistente no corpo; 400 com a lista de campos inválidos; filtro por artista e gênero com paginação e ordenação; 400 para `sort` inválido |
 | `CatalogoRegrasTest` | E-mail salvo em minúsculo e 409 por e-mail repetido; 400 de validação do usuário; faixa repetida no mesmo álbum (409) e permitida em outro álbum; músicas ordenadas pela faixa; 409 ao remover usuário, música, artista e gênero com dependentes; filtro de artistas por país; 400 para id inválido na rota e JSON com tipo errado |
-| `OpenApiDocsTest` | `/v3/api-docs` descreve a API, os 6 recursos e os erros em Problem Details; `/swagger-ui.html` abre a Swagger UI |
+| `OpenApiDocsTest` | `/v3/api-docs` descreve a API, os 6 recursos e os erros em Problem Details; `/swagger-ui.html` abre a Swagger UI; grava a especificação em `target/openapi.json` para o site; CORS liberado para o GitHub Pages e recusado (403) para outra origem |
 | `ObservabilidadeTest` | `/actuator/health` UP com banco e disco; `/actuator/info` com o nome da API; header `X-Instancia` em toda resposta, com o mesmo id do `/actuator/info`; `/actuator/metrics` com métricas HTTP, da JVM e do domínio; `musica.avaliacoes.criadas` aumenta ao criar e não muda numa avaliação recusada (409); `musica.avaliacoes.total` igual ao número de avaliações |
 | `PostgresIntegracaoTest` | Com o profile `postgres` e um **PostgreSQL 17 criado pelo Testcontainers**: health mostra PostgreSQL; seed carregado e listagens sem filtro (parâmetros nulos); rodar o seed de novo, como outra instância subindo, não duplica os dados (lock no banco); filtros combinados, LIKE sem diferenciar maiúsculas e ordenação; nota média com `avg` sobre `numeric`; criar avaliação (201) e repetir (409); e-mail e faixa repetidos (409); remoção com e sem dependentes. **Precisa do Docker rodando**; sem Docker, os 7 testes são pulados em vez de falhar |
 | `MusicaApplicationTests` | A aplicação sobe sem erros |
@@ -609,7 +611,7 @@ A documentação do projeto também está publicada como site em **[gabrieldorod
 
 - **Início, Domínio e Arquitetura:** problema, entidades, regras de negócio, diagrama de classes e diagrama do banco (Mermaid), camadas e infraestrutura;
 - **Como executar:** Docker, local com H2 e PostgreSQL;
-- **API:** endpoints e DTOs com exemplos, paginação/filtros/ordenação, validação e erros;
+- **API:** endpoints e DTOs com exemplos, paginação/filtros/ordenação, validação e erros, e a **Swagger UI** com a referência de todos os endpoints;
 - **Requisitos extras:** uma página por extra, com o que foi feito, como testar e as evidências;
 - **Evidências:** galeria com todos os prints;
 - **Projeto:** enunciado e cartas-desafio.
@@ -619,8 +621,9 @@ A documentação do projeto também está publicada como site em **[gabrieldorod
 | `mkdocs.yml` | Configuração do site: tema, navegação e extensões do Markdown |
 | `docs/` | Páginas do site em Markdown |
 | `mkdocs-hooks/evidencias.py` | Publica os prints da pasta `evidencias/` no site, sem duplicar as imagens |
+| `docs/swagger/index.html` e `mkdocs-hooks/swagger.py` | Swagger UI do site, em `/swagger/`, com a especificação `target/openapi.json` gerada pelos testes |
 | `requirements-docs.txt` | Dependências do MkDocs |
-| `.github/workflows/docs.yml` | GitHub Actions: gera o site com `mkdocs build --strict` em todo PR e publica no GitHub Pages a cada push na `main` |
+| `.github/workflows/docs.yml` | GitHub Actions: gera a especificação OpenAPI (`OpenApiDocsTest`) e o site com `mkdocs build --strict` em todo PR e publica no GitHub Pages a cada push na `main` |
 
 Para rodar localmente em `http://127.0.0.1:8000/apirest-2026/`:
 

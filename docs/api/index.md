@@ -33,7 +33,7 @@ Todos os recursos têm as mesmas cinco operações:
 
     Documentação interativa gerada do código, com **Try it out** já preenchido com dados do seed.
 
-    `http://localhost:8080/swagger-ui.html` · [Mais sobre o Swagger](../extras/swagger.md)
+    [Swagger UI publicada](/apirest-2026/swagger/) · `http://localhost:8080/swagger-ui.html` · [Mais sobre o Swagger](../extras/swagger.md)
 
 -   :material-email-fast-outline: **Postman**
 
