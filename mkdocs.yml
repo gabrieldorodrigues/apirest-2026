@@ -1,0 +1,119 @@
+site_name: API de Avaliação Musical
+site_description: API REST para avaliar álbuns e músicas com nota e resenha, no estilo do Letterboxd aplicado à música.
+site_author: Gabriel de Oliveira Rodrigues
+site_url: https://gabrieldorodrigues.github.io/apirest-2026/
+repo_url: https://github.com/gabrieldorodrigues/apirest-2026
+repo_name: gabrieldorodrigues/apirest-2026
+edit_uri: edit/main/docs/
+copyright: Projeto final da disciplina de API REST · 2026
+
+theme:
+  name: material
+  language: pt-BR
+  icon:
+    logo: material/music-circle
+    repo: fontawesome/brands/github
+  favicon: assets/favicon.svg
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: deep purple
+      accent: amber
+      toggle:
+        icon: material/weather-night
+        name: Mudar para o modo escuro
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: deep purple
+      accent: amber
+      toggle:
+        icon: material/weather-sunny
+        name: Mudar para o modo claro
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.indexes
+    - navigation.top
+    - navigation.footer
+    - navigation.instant
+    - search.highlight
+    - search.suggest
+    - toc.follow
+    - content.code.copy
+    - content.code.annotate
+    - content.tabs.link
+    - content.action.edit
+
+plugins:
+  - search:
+      lang: pt
+
+# publica as imagens da pasta evidencias/ da raiz no site, sem copiar os arquivos para docs/
+hooks:
+  - mkdocs-hooks/evidencias.py
+
+extra_css:
+  - assets/extra.css
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - footnotes
+  - def_list
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.mark
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/gabrieldorodrigues/apirest-2026
+      name: Repositório no GitHub
+
+nav:
+  - Início:
+      - index.md
+      - Domínio: dominio.md
+      - Arquitetura: arquitetura.md
+      - Entregas: entregas.md
+  - Como executar:
+      - executar/index.md
+      - Docker (recomendado): executar/docker.md
+      - Localmente (H2): executar/local.md
+      - PostgreSQL: executar/postgresql.md
+  - API:
+      - api/index.md
+      - Endpoints e DTOs: api/endpoints.md
+      - Paginação, filtros e ordenação: api/listagens.md
+      - Validação e erros: api/erros.md
+  - Requisitos extras:
+      - extras/index.md
+      - Testes automatizados: extras/testes.md
+      - Swagger/OpenAPI: extras/swagger.md
+      - Observabilidade: extras/observabilidade.md
+      - PostgreSQL: extras/postgresql.md
+      - Docker/Compose: extras/docker.md
+      - Load balancer: extras/load-balancer.md
+  - Evidências: evidencias.md
+  - Projeto:
+      - Enunciado: enunciado-projeto-final.md
+      - Cartas-desafio: cartas-desafio.md

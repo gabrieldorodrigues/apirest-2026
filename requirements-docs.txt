@@ -1,0 +1,4 @@
+# dependências para gerar a documentação (mkdocs serve / mkdocs build)
+mkdocs==1.6.1
+mkdocs-material==9.8.2
+pymdown-extensions==13.1

@@ -40,3 +40,6 @@ logs/
 
 ### Docker Compose ###
 .env
+
+### MkDocs ###
+site/

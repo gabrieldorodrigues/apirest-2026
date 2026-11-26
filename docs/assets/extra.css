@@ -1,0 +1,22 @@
+/* prints das evidências com borda e sombra leves, para destacar do fundo */
+.md-typeset img.evidencia {
+  border: 1px solid var(--md-default-fg-color--lightest);
+  border-radius: 6px;
+  box-shadow: var(--md-shadow-z1);
+}
+
+/* galeria de evidências em grade */
+.md-typeset .galeria {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
+  gap: 1rem;
+}
+
+.md-typeset .galeria figure {
+  margin: 0;
+}
+
+.md-typeset .galeria figcaption {
+  font-size: 0.7rem;
+  max-width: none;
+}

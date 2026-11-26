@@ -2,6 +2,8 @@
 
 API REST para avaliar álbuns e músicas. O usuário registra o que ouviu, dá uma nota e escreve uma resenha. A ideia segue o modelo do Letterboxd, aplicado à música.
 
+> 📖 **Documentação completa:** [gabrieldorodrigues.github.io/apirest-2026](https://gabrieldorodrigues.github.io/apirest-2026/). Tem páginas por assunto, busca, diagramas e a galeria de evidências (veja [Documentação com MkDocs](#documentação-com-mkdocs)).
+
 Projeto final da disciplina de API REST. O enunciado está em [docs/enunciado-projeto-final.md](docs/enunciado-projeto-final.md). O catálogo de cartas-desafio está em [docs/cartas-desafio.md](docs/cartas-desafio.md).
 
 ## Tema
@@ -577,6 +579,38 @@ Para rodar:
 - **Terminal:** `./mvnw test`.
 
 Evidência: [14-testes](evidencias/14-testes.png).
+
+## Documentação com MkDocs
+
+A documentação do projeto também está publicada como site em **[gabrieldorodrigues.github.io/apirest-2026](https://gabrieldorodrigues.github.io/apirest-2026/)**, feito com [MkDocs](https://www.mkdocs.org/) e o tema [Material for MkDocs](https://squidfunk.github.io/mkdocs-material/). O conteúdo é o deste README, organizado em páginas e com mais detalhes:
+
+- **Início, Domínio e Arquitetura:** problema, entidades, regras de negócio, diagrama de classes e diagrama do banco (Mermaid), camadas e infraestrutura;
+- **Como executar:** Docker, local com H2 e PostgreSQL;
+- **API:** endpoints e DTOs com exemplos, paginação/filtros/ordenação, validação e erros;
+- **Requisitos extras:** uma página por extra, com o que foi feito, como testar e as evidências;
+- **Evidências:** galeria com todos os prints;
+- **Projeto:** enunciado e cartas-desafio.
+
+| Arquivo | O que é |
+| --- | --- |
+| `mkdocs.yml` | Configuração do site: tema, navegação e extensões do Markdown |
+| `docs/` | Páginas do site em Markdown |
+| `mkdocs-hooks/evidencias.py` | Publica os prints da pasta `evidencias/` no site, sem duplicar as imagens |
+| `requirements-docs.txt` | Dependências do MkDocs |
+| `.github/workflows/docs.yml` | GitHub Actions: gera o site com `mkdocs build --strict` em todo PR e publica no GitHub Pages a cada push na `main` |
+
+Para rodar localmente em `http://127.0.0.1:8000/apirest-2026/`:
+
+```bash
+pip install -r requirements-docs.txt
+mkdocs serve
+```
+
+Sem Python instalado, dá para usar o Docker:
+
+```bash
+docker run --rm -p 8000:8000 -v "${PWD}:/docs" squidfunk/mkdocs-material
+```
 
 ## Evidências
 
