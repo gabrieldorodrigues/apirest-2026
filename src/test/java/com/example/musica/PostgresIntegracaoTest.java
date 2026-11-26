@@ -99,6 +99,28 @@ class PostgresIntegracaoTest {
     }
 
     @Test
+    @DisplayName("Relatório por período: count, sum com case, avg e group by no PostgreSQL")
+    void relatorioPorPeriodo() throws Exception {
+        mockMvc.perform(get("/relatorios/avaliacoes").param("inicio", "2026-09-01").param("fim", "2026-11-30"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalAvaliacoes").value(9))
+                .andExpect(jsonPath("$.avaliacoesDeAlbuns").value(5))
+                .andExpect(jsonPath("$.avaliacoesDeMusicas").value(4))
+                .andExpect(jsonPath("$.notaMedia").value(4.44))
+                .andExpect(jsonPath("$.usuariosQueAvaliaram").value(3))
+                .andExpect(jsonPath("$.distribuicaoNotas[9].quantidade").value(3))
+                .andExpect(jsonPath("$.porGenero[0].nome").value("Alternativo"))
+                .andExpect(jsonPath("$.porGenero[0].avaliacoes").value(5))
+                .andExpect(jsonPath("$.albunsMaisAvaliados[0].titulo").value("OK Computer"))
+                .andExpect(jsonPath("$.musicasMaisAvaliadas[0].titulo").value("Paranoid Android"));
+
+        mockMvc.perform(get("/relatorios/avaliacoes").param("inicio", "2020-01-01").param("fim", "2020-01-31"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalAvaliacoes").value(0))
+                .andExpect(jsonPath("$.avaliacoesDeAlbuns").value(0));
+    }
+
+    @Test
     @DisplayName("Criar avaliação (201) e repetir (409) gravando no PostgreSQL")
     void criaAvaliacaoERecusaRepetida() throws Exception {
         String corpo = """
