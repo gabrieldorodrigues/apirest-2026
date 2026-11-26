@@ -18,7 +18,10 @@ import org.springframework.transaction.annotation.Transactional;
 @SpringBootTest(properties = {
         "spring.datasource.url=jdbc:h2:mem:api-teste",
         // os testes logam só no console, sem misturar com o logs/musica.log da API
-        "logging.file.name="
+        "logging.file.name=",
+        // a transação de cada teste é desfeita, mas o cache não: um teste deixaria dados velhos para o outro.
+        // O cache tem testes próprios em CacheAlbunsTest e CacheRedisTest
+        "spring.cache.type=none"
 })
 @AutoConfigureMockMvc
 @Transactional

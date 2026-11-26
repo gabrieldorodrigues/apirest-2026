@@ -27,7 +27,8 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
  * LIKE sem diferenciar maiúsculas, média de numeric e constraints únicas.
  * Sem Docker rodando, a classe é pulada em vez de falhar.
  */
-@SpringBootTest(properties = "logging.file.name=")
+// sem cache pelo mesmo motivo do ApiTestBase: a transação de cada teste é desfeita
+@SpringBootTest(properties = { "logging.file.name=", "spring.cache.type=none" })
 @AutoConfigureMockMvc
 @ActiveProfiles("postgres")
 @Testcontainers(disabledWithoutDocker = true)
