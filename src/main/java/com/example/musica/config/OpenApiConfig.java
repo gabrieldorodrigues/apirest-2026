@@ -49,7 +49,8 @@ public class OpenApiConfig {
                 .addTagsItem(new Tag().name("Álbuns").description("Lançamentos de um artista, com nota média calculada"))
                 .addTagsItem(new Tag().name("Músicas").description("Faixas de um álbum, com nota média calculada"))
                 .addTagsItem(new Tag().name("Usuários").description("Pessoas que avaliam álbuns e músicas"))
-                .addTagsItem(new Tag().name("Avaliações").description("Nota e resenha de um usuário sobre um álbum ou uma música"));
+                .addTagsItem(new Tag().name("Avaliações").description("Nota e resenha de um usuário sobre um álbum ou uma música"))
+                .addTagsItem(new Tag().name("Relatórios").description("Totais e contagens das avaliações de um período"));
     }
 
     // toda resposta de erro (4xx/5xx) declarada nos controllers passa a mostrar o corpo Problem Details,
