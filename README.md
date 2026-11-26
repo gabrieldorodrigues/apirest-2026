@@ -131,9 +131,53 @@ classDiagram
 - H2 Database em arquivo (`./data/musica`), banco padrão
 - PostgreSQL 17 com o profile `postgres` (driver `org.postgresql:postgresql`)
 - Testcontainers (testes contra um PostgreSQL de verdade no Docker)
+- Docker e Docker Compose (API + PostgreSQL com um comando)
 - Maven
 
 ## Como executar
+
+Há duas formas: com **Docker**, que não precisa de Java nem de banco instalados e sobe a API com PostgreSQL, ou **localmente**, com JDK e H2.
+
+### Executar com Docker
+
+> Requisito extra: **Docker/Compose (5%)**, issue [#4](https://github.com/gabrieldorodrigues/apirest-2026/issues/4).
+
+Pré-requisito: [Docker Desktop](https://www.docker.com/products/docker-desktop/) aberto, com a engine rodando.
+
+```bash
+docker compose up --build
+```
+
+O `docker-compose.yml` sobe dois serviços:
+
+| Serviço | Imagem | Porta | O que faz |
+| --- | --- | --- | --- |
+| `db` (`musica-db`) | `postgres:17-alpine` | 5432 | PostgreSQL com os dados no volume `musica-pgdata` |
+| `api` (`musica-api`) | construída pelo `Dockerfile` | 8080 | A API com o profile `postgres`, conectada ao serviço `db` |
+
+Como funciona:
+
+- O **`Dockerfile`** é *multi-stage*. A primeira etapa compila o `.jar` com Maven e JDK 17. A imagem final leva só o JRE 17 (Alpine) e o `.jar`, roda com um usuário sem root e tem um `HEALTHCHECK` que consulta o `/actuator/health`;
+- A API só sobe depois que o PostgreSQL aceita conexões (`depends_on` com `condition: service_healthy` e `pg_isready` no `db`);
+- `docker compose ps` mostra os dois serviços como `healthy`;
+- Os dados ficam no volume `musica-pgdata` e sobrevivem a um `docker compose down`. Os logs da API ficam no volume `musica-logs`;
+- Os containers usam o fuso `America/Sao_Paulo`.
+
+Comandos úteis:
+
+```bash
+docker compose ps                     # situação dos serviços
+docker compose logs -f api            # logs da API
+docker compose down                   # para tudo e mantém os dados
+docker compose down -v                # para tudo e apaga os dados (o seed roda de novo)
+docker exec -it musica-db psql -U musica -d musica   # entra no PostgreSQL
+```
+
+Para trocar as portas ou as credenciais, copie o `.env.example` para `.env` e ajuste `API_PORT`, `DB_PORT`, `POSTGRES_DB`, `POSTGRES_USER` e `POSTGRES_PASSWORD`. Por exemplo, `API_PORT=8081` se a 8080 já estiver em uso.
+
+Evidência: [23-docker-compose-ps](evidencias/23-docker-compose-ps.png).
+
+### Executar localmente
 
 Pré-requisito: JDK 17 ou superior instalado.
 
@@ -168,7 +212,7 @@ Todas são opcionais. Sem elas, a API usa o H2 local.
 
 A API também roda em **PostgreSQL**. A troca é feita pelo profile `postgres` do Spring (`application-postgres.properties`), sem mudar nenhuma linha do código de domínio: as mesmas entidades, consultas JPQL e regras funcionam nos dois bancos. O H2 continua como padrão para desenvolvimento e para os testes.
 
-1. Suba um PostgreSQL. O jeito mais simples é com Docker:
+1. Suba um PostgreSQL. Uma opção é o `docker compose up -d db`, que sobe só o banco do [Compose](#executar-com-docker). Outra é um container avulso:
 
    ```bash
    docker run -d --name musica-postgres -e POSTGRES_DB=musica -e POSTGRES_USER=musica -e POSTGRES_PASSWORD=musica -p 5432:5432 postgres:17-alpine
@@ -212,6 +256,8 @@ src/main/java/com/example/musica
 ├── repository    # interfaces Spring Data JPA
 └── service       # regras de negócio
 ```
+
+Na raiz ficam o `Dockerfile`, o `docker-compose.yml` e o `.env.example` (veja [Executar com Docker](#executar-com-docker)).
 
 ## Endpoints
 
@@ -514,3 +560,4 @@ Prints da API rodando localmente, tirados no Postman e no console do H2. A colle
 | [20-postgres-health](evidencias/20-postgres-health.png) | API com o profile `postgres`: `/actuator/health` com `"database": "PostgreSQL"` |
 | [21-postgres-dados](evidencias/21-postgres-dados.png) | Tabelas criadas pelo Hibernate e álbuns do seed no PostgreSQL (`psql` no container) |
 | [22-testes-postgres](evidencias/22-testes-postgres.png) | `PostgresIntegracaoTest` passando contra o PostgreSQL 17 do Testcontainers |
+| [23-docker-compose-ps](evidencias/23-docker-compose-ps.png) | `docker compose ps` com `musica-api` e `musica-db` rodando e `healthy` |
