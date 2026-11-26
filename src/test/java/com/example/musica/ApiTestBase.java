@@ -15,7 +15,11 @@ import org.springframework.transaction.annotation.Transactional;
  * gêneros 1 Rock, 2 Alternativo; álbuns 1 OK Computer, 2 In Rainbows, 4 Kind of Blue;
  * músicas 1 Paranoid Android (faixa 2 do álbum 1), 4 Reckoner.
  */
-@SpringBootTest(properties = "spring.datasource.url=jdbc:h2:mem:api-teste")
+@SpringBootTest(properties = {
+        "spring.datasource.url=jdbc:h2:mem:api-teste",
+        // os testes logam só no console, sem misturar com o logs/musica.log da API
+        "logging.file.name="
+})
 @AutoConfigureMockMvc
 @Transactional
 public abstract class ApiTestBase {
