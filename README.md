@@ -136,6 +136,7 @@ classDiagram
 - PostgreSQL 17 com o profile `postgres` (driver `org.postgresql:postgresql`)
 - Testcontainers (testes contra um PostgreSQL de verdade no Docker)
 - Docker e Docker Compose (API + PostgreSQL com um comando)
+- Spring Cache com Redis 8 (cache dos álbuns)
 - GitHub Actions (CI/CD) e GitHub Container Registry
 - Maven
 
@@ -153,11 +154,12 @@ Pré-requisito: [Docker Desktop](https://www.docker.com/products/docker-desktop/
 docker compose up --build
 ```
 
-O `docker-compose.yml` sobe três serviços:
+O `docker-compose.yml` sobe quatro serviços:
 
 | Serviço | Imagem | Porta | O que faz |
 | --- | --- | --- | --- |
 | `db` (`musica-db`) | `postgres:17-alpine` | 5432 | PostgreSQL com os dados no volume `musica-pgdata` |
+| `redis` (`musica-redis`) | `redis:8-alpine` | só interna (6379) | Cache dos álbuns, compartilhado pelas réplicas (veja [Carta-desafio: cache de consultas frequentes](#carta-desafio-cache-de-consultas-frequentes)) |
 | `api` (3 réplicas: `apirest-2026-api-1`, `-2`, `-3`) | construída pelo `Dockerfile` | só interna (8080) | A API com o profile `postgres`, conectada ao serviço `db` |
 | `lb` (`musica-lb`) | `nginx:1.28-alpine` | 8080 | Load balancer: recebe as requisições e distribui entre as réplicas da `api` (veja [Load balancer e múltiplas instâncias](#load-balancer-e-múltiplas-instâncias)) |
 
@@ -211,6 +213,11 @@ Todas são opcionais. Sem elas, a API usa o H2 local.
 | `DB_URL` | `jdbc:h2:file:./data/musica` | `jdbc:postgresql://localhost:5432/musica` | URL JDBC do banco |
 | `DB_USER` | `sa` | `musica` | Usuário do banco |
 | `DB_PASSWORD` | (vazio) | `musica` | Senha do banco |
+| `CACHE_TYPE` | `simple` | `simple` (`redis` no docker compose) | Onde fica o cache dos álbuns: `simple` (em memória), `redis` ou `none` (desligado) |
+| `CACHE_TTL` | `10m` | `10m` | Tempo que um álbum fica no cache do Redis |
+| `REDIS_HOST` | `localhost` | `localhost` (`redis` no docker compose) | Endereço do Redis, usado só com `CACHE_TYPE=redis` |
+| `REDIS_PORT` | `6379` | `6379` | Porta do Redis |
+| `API_CORS_ORIGENS` | `https://gabrieldorodrigues.github.io` | igual | Origens que podem chamar a API pelo navegador (a Swagger UI do GitHub Pages) |
 
 ### Executar com PostgreSQL
 
@@ -443,6 +450,59 @@ Outros exemplos:
 - `GET /avaliacoes?notaMinima=4.5&sort=nota,desc` – avaliações com nota 4,5 ou mais, da maior para a menor;
 - `GET /artistas?pais=brasil` – artistas do Brasil.
 
+## Carta-desafio: cache de consultas frequentes
+
+> Carta-desafio: **5. Cache de consultas frequentes (40%)**, issue [#21](https://github.com/gabrieldorodrigues/apirest-2026/issues/21).
+
+**História de usuário:** como ouvinte que navega pelo catálogo, quero que a consulta de álbuns responda rápido, porque é a tela que mais abro e os álbuns mudam pouco. A nota média que aparece precisa estar sempre certa: quando alguém avalia um álbum, a nova média deve aparecer na hora, em qualquer instância da API.
+
+**Critérios de aceite:**
+
+- Cache de aplicação com Spring Cache e Redis em `GET /albuns/{id}` e `GET /albuns`;
+- TTL de 10 minutos, configurável com `CACHE_TTL`;
+- Invalidação quando os dados mudam: álbum, avaliação de álbum, artista e gênero;
+- Invalidação depois do commit, para outra réplica não guardar de novo o dado antigo;
+- Funciona com as 3 réplicas, porque o Redis é compartilhado;
+- Evidência de ganho: teste que conta os comandos SQL e métricas de hit e miss;
+- Usuários (e-mail) e avaliações ficam fora do cache;
+- Sem Redis, a API continua funcionando, com cache em memória.
+
+**O que fica em cache:**
+
+| Cache | Endpoint | Chave no Redis |
+| --- | --- | --- |
+| `album` | `GET /albuns/{id}` | `album::1` |
+| `albuns` | `GET /albuns` | `albuns::titulo=null;ano=null;artistaId=1;generoId=null;page=0;size=2;sort=titulo: ASC` |
+
+Os álbuns são a leitura mais frequente e a mais cara: cada álbum calcula a `notaMedia` com uma consulta ao banco. Com o cache, a segunda consulta igual não faz nenhum SQL.
+
+**Invalidação:**
+
+| Operação | O que é apagado |
+| --- | --- |
+| Criar álbum | Todas as listagens |
+| Editar ou remover álbum | O álbum e todas as listagens |
+| Criar, editar ou remover avaliação de álbum | O álbum avaliado (e o antigo, se a avaliação trocou de álbum) e todas as listagens |
+| Editar artista ou gênero | Todos os álbuns e todas as listagens, porque o nome vai dentro da resposta do álbum |
+
+Como foi feito:
+
+- O cache fica nos services que já existiam, com `@Cacheable` e `@CacheEvict`. Nenhuma entidade nova foi criada;
+- O Redis é compartilhado pelas réplicas. Com um cache em memória em cada réplica, a invalidação feita numa não chegaria às outras;
+- O `RedisCacheManager` é `transactionAware`: o cache só é apagado depois do commit;
+- Com o Redis fora do ar, o `CacheConfig` registra um aviso e a consulta segue para o banco, sem 500. Por isso o Redis não entra no `/actuator/health`;
+- Sem Redis (execução local com H2), o cache fica em memória (`CACHE_TYPE=simple`).
+
+Para ver o cache funcionando:
+
+```bash
+docker exec musica-redis redis-cli KEYS '*'
+docker exec musica-redis redis-cli TTL album::1
+curl "http://localhost:8080/actuator/metrics/cache.gets?tag=cache:album&tag=result:hit"
+```
+
+A página completa da carta, com a demonstração e os testes, está na [documentação](https://gabrieldorodrigues.github.io/apirest-2026/carta-desafio/).
+
 ## Documentação Swagger/OpenAPI
 
 > Requisito extra: **Swagger/OpenAPI (5%)**, issue [#1](https://github.com/gabrieldorodrigues/apirest-2026/issues/1).
@@ -562,7 +622,7 @@ Evidências: [24-lb-compose-ps](evidencias/24-lb-compose-ps.png), [25-lb-balance
 
 > Requisito extra: **Testes automatizados (5%)**, issue [#5](https://github.com/gabrieldorodrigues/apirest-2026/issues/5).
 
-São 59 testes de integração com JUnit 5, `@SpringBootTest` e `MockMvc`. Cada teste faz uma requisição HTTP de verdade para a API e confere o status, o corpo e o formato Problem Details dos erros. Os testes não usam mocks: passam pelo controller, pelo service, pelo repository e pelo banco.
+São 70 testes de integração com JUnit 5, `@SpringBootTest` e `MockMvc`. Cada teste faz uma requisição HTTP de verdade para a API e confere o status, o corpo e o formato Problem Details dos erros. Os testes não usam mocks: passam pelo controller, pelo service, pelo repository e pelo banco.
 
 - O banco é um H2 **em memória** (`jdbc:h2:mem:api-teste`), separado do `./data` usado no dia a dia. A exceção é o `PostgresIntegracaoTest`, que usa um PostgreSQL de verdade;
 - O `SeedConfig` carrega os mesmos dados de exemplo, então os testes usam os álbuns, músicas e usuários do seed;
@@ -573,6 +633,8 @@ São 59 testes de integração com JUnit 5, `@SpringBootTest` e `MockMvc`. Cada 
 | `AvaliacaoControllerTest` | CRUD de avaliação; recálculo da `notaMedia`; 409 por avaliação repetida de álbum e de música; editar a própria avaliação não conta como repetida; 422 para álbum e música ao mesmo tempo, sem nenhum dos dois e nota fora do passo de 0,5; 400 para nota fora de 0,5 a 5 e campos obrigatórios; 404 para usuário inexistente; histórico por `usuarioId`; filtro `notaMinima` com ordenação |
 | `AlbumControllerTest` | CRUD de álbum; `notaMedia` calculada; 409 ao remover álbum com músicas; 404 em Problem Details; 404 para gênero inexistente no corpo; 400 com a lista de campos inválidos; filtro por artista e gênero com paginação e ordenação; 400 para `sort` inválido |
 | `CatalogoRegrasTest` | E-mail salvo em minúsculo e 409 por e-mail repetido; 400 de validação do usuário; faixa repetida no mesmo álbum (409) e permitida em outro álbum; músicas ordenadas pela faixa; 409 ao remover usuário, música, artista e gênero com dependentes; filtro de artistas por país; 400 para id inválido na rota e JSON com tipo errado |
+| `CacheAlbunsTest` | Cache dos álbuns em memória: segunda busca e listagem repetida sem SQL; outra página vai ao banco; criar, editar e remover avaliação atualizam a `notaMedia`; avaliação que troca de álbum invalida o antigo; editar artista invalida os álbuns; 404 fora do cache; só álbuns têm cache |
+| `CacheRedisTest` | O mesmo cache num **Redis 8 criado pelo Testcontainers**: chave `album::1` e TTL; listagem lida de volta do Redis; avaliação apaga as chaves; métricas de hit. **Precisa do Docker**; sem Docker, os 4 testes são pulados |
 | `OpenApiDocsTest` | `/v3/api-docs` descreve a API, os 6 recursos e os erros em Problem Details; `/swagger-ui.html` abre a Swagger UI; grava a especificação em `target/openapi.json` para o site; CORS liberado para o GitHub Pages e recusado (403) para outra origem |
 | `ObservabilidadeTest` | `/actuator/health` UP com banco e disco; `/actuator/info` com o nome da API; header `X-Instancia` em toda resposta, com o mesmo id do `/actuator/info`; `/actuator/metrics` com métricas HTTP, da JVM e do domínio; `musica.avaliacoes.criadas` aumenta ao criar e não muda numa avaliação recusada (409); `musica.avaliacoes.total` igual ao número de avaliações |
 | `PostgresIntegracaoTest` | Com o profile `postgres` e um **PostgreSQL 17 criado pelo Testcontainers**: health mostra PostgreSQL; seed carregado e listagens sem filtro (parâmetros nulos); rodar o seed de novo, como outra instância subindo, não duplica os dados (lock no banco); filtros combinados, LIKE sem diferenciar maiúsculas e ordenação; nota média com `avg` sobre `numeric`; criar avaliação (201) e repetir (409); e-mail e faixa repetidos (409); remoção com e sem dependentes. **Precisa do Docker rodando**; sem Docker, os 7 testes são pulados em vez de falhar |
