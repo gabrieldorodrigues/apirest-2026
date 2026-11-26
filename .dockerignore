@@ -1,0 +1,17 @@
+target/
+data/
+logs/
+.git/
+.idea/
+.vscode/
+.mvn/
+mvnw
+*.iml
+docs/
+evidencias/
+postman/
+.postman/
+README.md
+Dockerfile
+docker-compose.yml
+.env
