@@ -3,7 +3,7 @@
 !!! abstract "Requisito extra · 5%"
     Issue [#5](https://github.com/gabrieldorodrigues/apirest-2026/issues/5) · PR [#6](https://github.com/gabrieldorodrigues/apirest-2026/pull/6)
 
-São **59 testes de integração** com JUnit 5, `@SpringBootTest` e `MockMvc`. Cada teste faz uma requisição HTTP para a API e confere o status, o corpo e o formato Problem Details dos erros. Os testes **não usam mocks**: passam pelo controller, pelo service, pelo repository e pelo banco.
+São **69 testes de integração** com JUnit 5, `@SpringBootTest` e `MockMvc`. Cada teste faz uma requisição HTTP para a API e confere o status, o corpo e o formato Problem Details dos erros. Os testes **não usam mocks**: passam pelo controller, pelo service, pelo repository e pelo banco.
 
 ## Como funciona
 
@@ -50,12 +50,13 @@ void conflitoAvaliacaoRepetidaDeAlbum() throws Exception {
 | `AlbumControllerTest` | 10 | CRUD de álbum; `notaMedia` calculada; 409 ao remover álbum com músicas; 404 em Problem Details; 404 para gênero inexistente no corpo; 400 com a lista de campos inválidos; filtro por artista e gênero com paginação e ordenação; 400 para `sort` inválido |
 | `CatalogoRegrasTest` | 14 | E-mail salvo em minúsculo e 409 por e-mail repetido; 400 de validação do usuário; faixa repetida no mesmo álbum (409) e permitida em outro álbum; músicas ordenadas pela faixa; 409 ao remover usuário, música, artista e gênero com dependentes; filtro de artistas por país; 400 para id inválido na rota e JSON com tipo errado |
 | `ObservabilidadeTest` | 7 | Health, info, header `X-Instancia`, métricas HTTP, da JVM e do domínio; contador de avaliações aumenta ao criar e não muda no 409 |
+| `RelatorioControllerTest` | 9 | Relatório por período da [carta-desafio](../carta-desafio.md#testes): totais do seed, períodos diferentes, datas inclusivas, período vazio, 400 e 422, número fixo de consultas |
 | `OpenApiDocsTest` | 5 | `/v3/api-docs` descreve a API e os erros; `/swagger-ui.html` abre a Swagger UI; grava a especificação para o site; CORS liberado para o GitHub Pages e recusado para outra origem |
-| `PostgresIntegracaoTest` | 7 | Os mesmos cenários principais contra o PostgreSQL 17 do Testcontainers, incluindo o seed sem duplicar |
+| `PostgresIntegracaoTest` | 8 | Os mesmos cenários principais contra o PostgreSQL 17 do Testcontainers, incluindo o seed sem duplicar e o relatório por período |
 | `MusicaApplicationTests` | 1 | A aplicação sobe sem erros |
 
 !!! warning "Docker para os testes do PostgreSQL"
-    O `PostgresIntegracaoTest` precisa do Docker rodando. Sem Docker, os 7 testes são **pulados** (`@Testcontainers(disabledWithoutDocker = true)`) em vez de falhar, e o restante da suíte roda normalmente.
+    O `PostgresIntegracaoTest` precisa do Docker rodando. Sem Docker, os 8 testes são **pulados** (`@Testcontainers(disabledWithoutDocker = true)`) em vez de falhar, e o restante da suíte roda normalmente.
 
 ## Como rodar
 

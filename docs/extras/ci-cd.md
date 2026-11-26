@@ -63,5 +63,5 @@ A `main` exige o check **Testes** verde para aceitar o merge de um pull request.
 ## Como testar
 
 1. Abra um pull request e veja o workflow **CI** em **Checks**: o job **Testes** e depois o job **Imagem Docker**.
-2. Abra o resumo da execução e confira a tabela com os testes de cada classe, inclusive os 7 do `PostgresIntegracaoTest`.
+2. Abra o resumo da execução e confira a tabela com os testes de cada classe, inclusive os 8 do `PostgresIntegracaoTest`.
 3. Depois do merge na `main`, veja a imagem em **Packages** no repositório e rode a versão publicada com os comandos acima.

@@ -279,6 +279,8 @@ Todas as entidades têm CRUD completo:
 
 Recursos: `/artistas`, `/generos`, `/albuns`, `/musicas`, `/usuarios` e `/avaliacoes`.
 
+Além do CRUD, `GET /relatorios/avaliacoes` traz o relatório das avaliações de um período (veja [Carta-desafio: relatório por período](#carta-desafio-relatório-por-período)).
+
 A collection do Postman com todas as requisições está em [postman/collections/apirest-2026](postman/collections/apirest-2026), no formato v3 (YAML). Para usar, abra a pasta raiz do repositório no Postman (Local Mode). Cada pasta da collection é um diretório e cada requisição é um arquivo `.request.yaml`.
 
 ## DTOs
@@ -329,10 +331,10 @@ Os erros são tratados no `ApiExceptionHandler` e sempre retornam no formato Pro
 
 | Código | Quando acontece |
 | --- | --- |
-| 400 | Campo obrigatório vazio, formato inválido, nota fora de 0,5 a 5, JSON mal formatado, id inválido na rota, campo de `sort` inexistente |
+| 400 | Campo obrigatório vazio, formato inválido, nota fora de 0,5 a 5, JSON mal formatado, id inválido na rota, data inválida no relatório, parâmetro obrigatório ausente, campo de `sort` inexistente |
 | 404 | Recurso não existe (inclusive ids informados no corpo, como `artistaId` ou `generoIds`) |
 | 409 | E-mail repetido, gênero repetido, número de faixa repetido no álbum, usuário avaliando o mesmo álbum/música duas vezes, remoção de registro que tem dependentes |
-| 422 | Avaliação com álbum e música ao mesmo tempo (ou sem nenhum dos dois), nota fora do passo de 0,5 |
+| 422 | Avaliação com álbum e música ao mesmo tempo (ou sem nenhum dos dois), nota fora do passo de 0,5, relatório com data inicial depois da final ou período maior que 1 ano |
 | 500 | Erro inesperado (a mensagem não expõe detalhes internos) |
 
 Regras de remoção: não dá para remover artista com álbuns, álbum com músicas ou avaliações, música com avaliações, usuário com avaliações e gênero usado por álbuns. Nesses casos a API retorna 409.
@@ -442,6 +444,67 @@ Outros exemplos:
 - `GET /musicas?albumId=1&sort=numeroFaixa` – faixas do OK Computer em ordem;
 - `GET /avaliacoes?notaMinima=4.5&sort=nota,desc` – avaliações com nota 4,5 ou mais, da maior para a menor;
 - `GET /artistas?pais=brasil` – artistas do Brasil.
+
+## Carta-desafio: relatório por período
+
+> Carta-desafio: **8. Relatório agregado por período (40%)**, issue [#19](https://github.com/gabrieldorodrigues/apirest-2026/issues/19).
+
+**História de usuário:** como curador da plataforma de avaliação musical, quero obter totais e contagens das avaliações feitas em um período. Assim acompanho o que os usuários estão ouvindo e avaliando: quantas avaliações foram feitas, qual a nota média e quais gêneros, álbuns e músicas mais movimentaram a plataforma.
+
+```http
+GET /relatorios/avaliacoes?inicio=2026-09-01&fim=2026-11-30
+```
+
+As duas datas (`AAAA-MM-DD`) são obrigatórias e entram no período. O período usa a data de criação da avaliação. O relatório traz:
+
+| Campo | O que é |
+| --- | --- |
+| `totalAvaliacoes`, `avaliacoesDeAlbuns`, `avaliacoesDeMusicas` | Avaliações criadas no período, no total e por tipo de item |
+| `notaMedia` | Média das notas, com 2 casas. Fica `null` quando não há avaliações |
+| `usuariosQueAvaliaram` | Usuários diferentes que avaliaram no período |
+| `distribuicaoNotas` | Quantidade de avaliações para cada nota, de 0,5 a 5, inclusive as que ninguém deu |
+| `porGenero` | Avaliações e média por gênero. A avaliação de uma música conta para os gêneros do álbum dela |
+| `albunsMaisAvaliados`, `musicasMaisAvaliadas` | Até 5 de cada, com artista, quantidade e nota média. Empate vai pela maior nota média |
+
+Exemplo com o seed, que grava as avaliações entre setembro e novembro de 2026 (trecho):
+
+```json
+{
+  "inicio": "2026-09-01",
+  "fim": "2026-11-30",
+  "totalAvaliacoes": 9,
+  "avaliacoesDeAlbuns": 5,
+  "avaliacoesDeMusicas": 4,
+  "notaMedia": 4.44,
+  "usuariosQueAvaliaram": 3,
+  "porGenero": [
+    { "id": 2, "nome": "Alternativo", "avaliacoes": 5, "notaMedia": 4.6 },
+    { "id": 1, "nome": "Rock", "avaliacoes": 5, "notaMedia": 4.6 }
+  ],
+  "albunsMaisAvaliados": [
+    { "id": 1, "titulo": "OK Computer", "artista": "Radiohead", "avaliacoes": 2, "notaMedia": 4.75 }
+  ]
+}
+```
+
+Com `inicio=2026-10-01&fim=2026-10-31`, o total cai para 3, todas de álbuns. Com um período sem avaliações, a resposta é 200 com as contagens zeradas.
+
+| Erro | Quando acontece |
+| --- | --- |
+| 400 Parâmetro obrigatório | Falta `inicio` ou `fim` |
+| 400 Parâmetro inválido | Data fora do formato ou inexistente, como `2026-13-01` |
+| 422 Regra de negócio violada | `inicio` depois de `fim`, ou período maior que 1 ano |
+
+Como foi feito:
+
+- O relatório só lê as entidades que já existem. O `RelatorioController` recebe as datas, o `RelatorioService` valida o período e o `AvaliacaoRepository` faz as consultas;
+- O banco faz as contas (`count`, `sum`, `avg`, `group by`). Cada relatório faz sempre **5 consultas**, qualquer que seja o número de avaliações, e um teste confere isso (sem N+1);
+- A `Avaliacao` só preenche `criadaEm` quando a data está vazia, para o seed gravar datas no passado. Pela API, a data continua sendo a do momento da criação;
+- O `ApiExceptionHandler` passou a tratar parâmetro obrigatório ausente com 400. Antes, isso caía no erro interno (500).
+
+> **Nota:** o seed só roda com o banco vazio. Para gravar as datas novas num banco antigo, rode `docker compose down -v` no Docker ou apague a pasta `data/` com o H2 local.
+
+A página completa da carta, com os exemplos e as consultas, está na [documentação](https://gabrieldorodrigues.github.io/apirest-2026/carta-desafio/).
 
 ## Documentação Swagger/OpenAPI
 
@@ -562,7 +625,7 @@ Evidências: [24-lb-compose-ps](evidencias/24-lb-compose-ps.png), [25-lb-balance
 
 > Requisito extra: **Testes automatizados (5%)**, issue [#5](https://github.com/gabrieldorodrigues/apirest-2026/issues/5).
 
-São 59 testes de integração com JUnit 5, `@SpringBootTest` e `MockMvc`. Cada teste faz uma requisição HTTP de verdade para a API e confere o status, o corpo e o formato Problem Details dos erros. Os testes não usam mocks: passam pelo controller, pelo service, pelo repository e pelo banco.
+São 69 testes de integração com JUnit 5, `@SpringBootTest` e `MockMvc`. Cada teste faz uma requisição HTTP de verdade para a API e confere o status, o corpo e o formato Problem Details dos erros. Os testes não usam mocks: passam pelo controller, pelo service, pelo repository e pelo banco.
 
 - O banco é um H2 **em memória** (`jdbc:h2:mem:api-teste`), separado do `./data` usado no dia a dia. A exceção é o `PostgresIntegracaoTest`, que usa um PostgreSQL de verdade;
 - O `SeedConfig` carrega os mesmos dados de exemplo, então os testes usam os álbuns, músicas e usuários do seed;
@@ -573,9 +636,10 @@ São 59 testes de integração com JUnit 5, `@SpringBootTest` e `MockMvc`. Cada 
 | `AvaliacaoControllerTest` | CRUD de avaliação; recálculo da `notaMedia`; 409 por avaliação repetida de álbum e de música; editar a própria avaliação não conta como repetida; 422 para álbum e música ao mesmo tempo, sem nenhum dos dois e nota fora do passo de 0,5; 400 para nota fora de 0,5 a 5 e campos obrigatórios; 404 para usuário inexistente; histórico por `usuarioId`; filtro `notaMinima` com ordenação |
 | `AlbumControllerTest` | CRUD de álbum; `notaMedia` calculada; 409 ao remover álbum com músicas; 404 em Problem Details; 404 para gênero inexistente no corpo; 400 com a lista de campos inválidos; filtro por artista e gênero com paginação e ordenação; 400 para `sort` inválido |
 | `CatalogoRegrasTest` | E-mail salvo em minúsculo e 409 por e-mail repetido; 400 de validação do usuário; faixa repetida no mesmo álbum (409) e permitida em outro álbum; músicas ordenadas pela faixa; 409 ao remover usuário, música, artista e gênero com dependentes; filtro de artistas por país; 400 para id inválido na rota e JSON com tipo errado |
+| `RelatorioControllerTest` | Relatório por período: totais, média, usuários, distribuição das notas, gêneros e mais avaliados do seed; outubro e novembro com resultados diferentes; datas inclusivas; período vazio com contagens zeradas; avaliação nova entrando no relatório; 422 para início depois do fim e para período maior que 1 ano; 400 para data ausente e inválida; 5 consultas com 9 ou 29 avaliações (sem N+1) |
 | `OpenApiDocsTest` | `/v3/api-docs` descreve a API, os 6 recursos e os erros em Problem Details; `/swagger-ui.html` abre a Swagger UI; grava a especificação em `target/openapi.json` para o site; CORS liberado para o GitHub Pages e recusado (403) para outra origem |
 | `ObservabilidadeTest` | `/actuator/health` UP com banco e disco; `/actuator/info` com o nome da API; header `X-Instancia` em toda resposta, com o mesmo id do `/actuator/info`; `/actuator/metrics` com métricas HTTP, da JVM e do domínio; `musica.avaliacoes.criadas` aumenta ao criar e não muda numa avaliação recusada (409); `musica.avaliacoes.total` igual ao número de avaliações |
-| `PostgresIntegracaoTest` | Com o profile `postgres` e um **PostgreSQL 17 criado pelo Testcontainers**: health mostra PostgreSQL; seed carregado e listagens sem filtro (parâmetros nulos); rodar o seed de novo, como outra instância subindo, não duplica os dados (lock no banco); filtros combinados, LIKE sem diferenciar maiúsculas e ordenação; nota média com `avg` sobre `numeric`; criar avaliação (201) e repetir (409); e-mail e faixa repetidos (409); remoção com e sem dependentes. **Precisa do Docker rodando**; sem Docker, os 7 testes são pulados em vez de falhar |
+| `PostgresIntegracaoTest` | Com o profile `postgres` e um **PostgreSQL 17 criado pelo Testcontainers**: health mostra PostgreSQL; seed carregado e listagens sem filtro (parâmetros nulos); rodar o seed de novo, como outra instância subindo, não duplica os dados (lock no banco); filtros combinados, LIKE sem diferenciar maiúsculas e ordenação; nota média com `avg` sobre `numeric`; relatório por período com `count`, `sum` com `case`, `avg` e `group by`; criar avaliação (201) e repetir (409); e-mail e faixa repetidos (409); remoção com e sem dependentes. **Precisa do Docker rodando**; sem Docker, os 8 testes são pulados em vez de falhar |
 | `MusicaApplicationTests` | A aplicação sobe sem erros |
 
 Para rodar:
