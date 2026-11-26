@@ -30,6 +30,14 @@ Projeto final da disciplina de API REST · Tema **Entretenimento e Cultura**.
 
     [:octicons-arrow-right-24: Domínio](dominio.md)
 
+-   :material-lightning-bolt: **Carta-desafio**
+
+    ---
+
+    Cache dos álbuns no Redis, compartilhado pelas 3 réplicas, com TTL e invalidação a cada avaliação.
+
+    [:octicons-arrow-right-24: Cache de consultas frequentes](carta-desafio.md)
+
 -   :material-star-plus: **Requisitos extras**
 
     ---
