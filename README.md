@@ -128,7 +128,9 @@ classDiagram
 - Spring Boot 4.1.1 (Web MVC, Data JPA, Validation)
 - springdoc-openapi 3.1.1 (Swagger UI e OpenAPI 3)
 - Spring Boot Actuator e Micrometer (health check, informações e métricas)
-- H2 Database em arquivo (`./data/musica`)
+- H2 Database em arquivo (`./data/musica`), banco padrão
+- PostgreSQL 17 com o profile `postgres` (driver `org.postgresql:postgresql`)
+- Testcontainers (testes contra um PostgreSQL de verdade no Docker)
 - Maven
 
 ## Como executar
@@ -153,11 +155,43 @@ Para rodar os testes: pelo IntelliJ, clique com o botão direito em `src/test/ja
 
 Todas são opcionais. Sem elas, a API usa o H2 local.
 
-| Variável | Padrão | Descrição |
-| --- | --- | --- |
-| `DB_URL` | `jdbc:h2:file:./data/musica` | URL JDBC do banco |
-| `DB_USER` | `sa` | Usuário do banco |
-| `DB_PASSWORD` | (vazio) | Senha do banco |
+| Variável | Padrão (H2) | Padrão com o profile `postgres` | Descrição |
+| --- | --- | --- | --- |
+| `SPRING_PROFILES_ACTIVE` | (vazio) | `postgres` | Ativa o PostgreSQL |
+| `DB_URL` | `jdbc:h2:file:./data/musica` | `jdbc:postgresql://localhost:5432/musica` | URL JDBC do banco |
+| `DB_USER` | `sa` | `musica` | Usuário do banco |
+| `DB_PASSWORD` | (vazio) | `musica` | Senha do banco |
+
+### Executar com PostgreSQL
+
+> Requisito extra: **SGBD diferente do H2 (5%)**, issue [#3](https://github.com/gabrieldorodrigues/apirest-2026/issues/3).
+
+A API também roda em **PostgreSQL**. A troca é feita pelo profile `postgres` do Spring (`application-postgres.properties`), sem mudar nenhuma linha do código de domínio: as mesmas entidades, consultas JPQL e regras funcionam nos dois bancos. O H2 continua como padrão para desenvolvimento e para os testes.
+
+1. Suba um PostgreSQL. O jeito mais simples é com Docker:
+
+   ```bash
+   docker run -d --name musica-postgres -e POSTGRES_DB=musica -e POSTGRES_USER=musica -e POSTGRES_PASSWORD=musica -p 5432:5432 postgres:17-alpine
+   ```
+
+2. Rode a API com o profile `postgres`:
+   - **IntelliJ:** em **Run → Edit Configurations → MusicaApplication**, preencha **Active profiles** com `postgres` (ou a variável de ambiente `SPRING_PROFILES_ACTIVE=postgres`);
+   - **Terminal:** `SPRING_PROFILES_ACTIVE=postgres ./mvnw spring-boot:run`.
+
+3. Na primeira execução o Hibernate cria as tabelas e o seed grava os dados de exemplo. `GET /actuator/health` mostra `"database": "PostgreSQL"`.
+
+Para conferir os dados direto no banco:
+
+```bash
+docker exec -it musica-postgres psql -U musica -d musica -c "\dt"
+docker exec -it musica-postgres psql -U musica -d musica -c "select titulo, ano_lancamento from albuns;"
+```
+
+Para usar outro servidor PostgreSQL, informe `DB_URL`, `DB_USER` e `DB_PASSWORD`. O console do H2 fica desligado nesse profile.
+
+A compatibilidade é garantida por testes: o `PostgresIntegracaoTest` usa o **Testcontainers** para subir um PostgreSQL 17 no Docker durante o `./mvnw test` e roda a API contra ele (veja [Testes automatizados](#testes-automatizados)).
+
+Evidências: [20-postgres-health](evidencias/20-postgres-health.png), [21-postgres-dados](evidencias/21-postgres-dados.png) e [22-testes-postgres](evidencias/22-testes-postgres.png).
 
 ### Console do H2
 
@@ -429,9 +463,9 @@ Evidências: [17-actuator-health](evidencias/17-actuator-health.png), [18-actuat
 
 > Requisito extra: **Testes automatizados (5%)**, issue [#5](https://github.com/gabrieldorodrigues/apirest-2026/issues/5).
 
-São 48 testes de integração com JUnit 5, `@SpringBootTest` e `MockMvc`. Cada teste faz uma requisição HTTP de verdade para a API e confere o status, o corpo e o formato Problem Details dos erros. Os testes não usam mocks: passam pelo controller, pelo service, pelo repository e pelo banco.
+São 54 testes de integração com JUnit 5, `@SpringBootTest` e `MockMvc`. Cada teste faz uma requisição HTTP de verdade para a API e confere o status, o corpo e o formato Problem Details dos erros. Os testes não usam mocks: passam pelo controller, pelo service, pelo repository e pelo banco.
 
-- O banco é um H2 **em memória** (`jdbc:h2:mem:api-teste`), separado do `./data` usado no dia a dia;
+- O banco é um H2 **em memória** (`jdbc:h2:mem:api-teste`), separado do `./data` usado no dia a dia. A exceção é o `PostgresIntegracaoTest`, que usa um PostgreSQL de verdade;
 - O `SeedConfig` carrega os mesmos dados de exemplo, então os testes usam os álbuns, músicas e usuários do seed;
 - A classe base `ApiTestBase` é `@Transactional`: cada teste é desfeito no final, e um teste não afeta o outro.
 
@@ -442,6 +476,7 @@ São 48 testes de integração com JUnit 5, `@SpringBootTest` e `MockMvc`. Cada 
 | `CatalogoRegrasTest` | E-mail salvo em minúsculo e 409 por e-mail repetido; 400 de validação do usuário; faixa repetida no mesmo álbum (409) e permitida em outro álbum; músicas ordenadas pela faixa; 409 ao remover usuário, música, artista e gênero com dependentes; filtro de artistas por país; 400 para id inválido na rota e JSON com tipo errado |
 | `OpenApiDocsTest` | `/v3/api-docs` descreve a API, os 6 recursos e os erros em Problem Details; `/swagger-ui.html` abre a Swagger UI |
 | `ObservabilidadeTest` | `/actuator/health` UP com banco e disco; `/actuator/info` com o nome da API; `/actuator/metrics` com métricas HTTP, da JVM e do domínio; `musica.avaliacoes.criadas` aumenta ao criar e não muda numa avaliação recusada (409); `musica.avaliacoes.total` igual ao número de avaliações |
+| `PostgresIntegracaoTest` | Com o profile `postgres` e um **PostgreSQL 17 criado pelo Testcontainers**: health mostra PostgreSQL; seed carregado e listagens sem filtro (parâmetros nulos); filtros combinados, LIKE sem diferenciar maiúsculas e ordenação; nota média com `avg` sobre `numeric`; criar avaliação (201) e repetir (409); e-mail e faixa repetidos (409); remoção com e sem dependentes. **Precisa do Docker rodando**; sem Docker, os 6 testes são pulados em vez de falhar |
 | `MusicaApplicationTests` | A aplicação sobe sem erros |
 
 Para rodar:
@@ -476,3 +511,6 @@ Prints da API rodando localmente, tirados no Postman e no console do H2. A colle
 | [17-actuator-health](evidencias/17-actuator-health.png) | `GET /actuator/health` com status `UP` e detalhes do banco e do disco |
 | [18-actuator-metricas](evidencias/18-actuator-metricas.png) | Métrica `musica.avaliacoes.criadas?tag=tipo:album` com 1 avaliação criada |
 | [19-logs](evidencias/19-logs.png) | `logs/musica.log` com a API rodando: avaliação criada (log do service) e `POST /avaliacoes -> 201` (log das requisições) |
+| [20-postgres-health](evidencias/20-postgres-health.png) | API com o profile `postgres`: `/actuator/health` com `"database": "PostgreSQL"` |
+| [21-postgres-dados](evidencias/21-postgres-dados.png) | Tabelas criadas pelo Hibernate e álbuns do seed no PostgreSQL (`psql` no container) |
+| [22-testes-postgres](evidencias/22-testes-postgres.png) | `PostgresIntegracaoTest` passando contra o PostgreSQL 17 do Testcontainers |
