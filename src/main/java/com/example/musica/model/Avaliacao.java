@@ -47,9 +47,12 @@ public class Avaliacao {
     public Avaliacao() {
     }
 
+    // pela API a data é sempre a do momento da criação; o seed grava datas no passado para o relatório por período
     @PrePersist
     void antesDeSalvar() {
-        criadaEm = LocalDateTime.now();
+        if (criadaEm == null) {
+            criadaEm = LocalDateTime.now();
+        }
         atualizadaEm = criadaEm;
     }
 

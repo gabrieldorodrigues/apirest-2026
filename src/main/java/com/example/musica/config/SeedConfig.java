@@ -1,6 +1,7 @@
 package com.example.musica.config;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -81,15 +82,16 @@ public class SeedConfig {
             Usuario ana = usuarioRepository.save(new Usuario("Ana", "ana@email.com"));
             Usuario joao = usuarioRepository.save(new Usuario("João", "joao@email.com"));
 
-            avaliacaoRepository.save(avaliacao(gabriel, okComputer, null, "5.0", "Melhor álbum dos anos 90."));
-            avaliacaoRepository.save(avaliacao(ana, okComputer, null, "4.5", "Clássico, mas um pouco frio."));
-            avaliacaoRepository.save(avaliacao(joao, inRainbows, null, "4.0", null));
-            avaliacaoRepository.save(avaliacao(gabriel, kindOfBlue, null, "4.5", "Perfeito pra estudar."));
-            avaliacaoRepository.save(avaliacao(ana, caetano1968, null, "5.0", "Tropicália raiz."));
-            avaliacaoRepository.save(avaliacao(gabriel, null, paranoid, "5.0", "Três músicas em uma."));
-            avaliacaoRepository.save(avaliacao(joao, null, reckoner, "4.5", null));
-            avaliacaoRepository.save(avaliacao(ana, null, tropicaliaMusica, "4.0", null));
-            avaliacaoRepository.save(avaliacao(joao, null, soWhat, "3.5", "Bom, mas longo."));
+            // datas espalhadas entre setembro e novembro de 2026, em ordem, para o relatório por período
+            avaliacaoRepository.save(avaliacao(gabriel, okComputer, null, "5.0", "Melhor álbum dos anos 90.", "2026-09-05T20:15"));
+            avaliacaoRepository.save(avaliacao(ana, okComputer, null, "4.5", "Clássico, mas um pouco frio.", "2026-09-18T21:40"));
+            avaliacaoRepository.save(avaliacao(joao, inRainbows, null, "4.0", null, "2026-10-02T19:05"));
+            avaliacaoRepository.save(avaliacao(gabriel, kindOfBlue, null, "4.5", "Perfeito pra estudar.", "2026-10-11T14:30"));
+            avaliacaoRepository.save(avaliacao(ana, caetano1968, null, "5.0", "Tropicália raiz.", "2026-10-24T22:10"));
+            avaliacaoRepository.save(avaliacao(gabriel, null, paranoid, "5.0", "Três músicas em uma.", "2026-11-03T18:45"));
+            avaliacaoRepository.save(avaliacao(joao, null, reckoner, "4.5", null, "2026-11-09T23:20"));
+            avaliacaoRepository.save(avaliacao(ana, null, tropicaliaMusica, "4.0", null, "2026-11-15T10:00"));
+            avaliacaoRepository.save(avaliacao(joao, null, soWhat, "3.5", "Bom, mas longo.", "2026-11-20T16:35"));
         });
     }
 
@@ -120,13 +122,15 @@ public class SeedConfig {
         return musica;
     }
 
-    private Avaliacao avaliacao(Usuario usuario, Album album, Musica musica, String nota, String resenha) {
+    private Avaliacao avaliacao(Usuario usuario, Album album, Musica musica, String nota, String resenha,
+            String criadaEm) {
         Avaliacao avaliacao = new Avaliacao();
         avaliacao.setUsuario(usuario);
         avaliacao.setAlbum(album);
         avaliacao.setMusica(musica);
         avaliacao.setNota(new BigDecimal(nota));
         avaliacao.setResenha(resenha);
+        avaliacao.setCriadaEm(LocalDateTime.parse(criadaEm));
         return avaliacao;
     }
 }
