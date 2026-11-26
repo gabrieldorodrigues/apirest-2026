@@ -126,6 +126,7 @@ classDiagram
 
 - Java 17
 - Spring Boot 4.1.1 (Web MVC, Data JPA, Validation)
+- springdoc-openapi 3.1.1 (Swagger UI e OpenAPI 3)
 - H2 Database em arquivo (`./data/musica`)
 - Maven
 
@@ -142,6 +143,8 @@ Pré-requisito: JDK 17 ou superior instalado.
 ```
 
 A API sobe em `http://localhost:8080`. Na primeira execução o banco é criado em `./data/` e um seed cadastra gêneros, artistas, álbuns, músicas, usuários e avaliações de exemplo. Para voltar ao estado inicial, é só apagar a pasta `data/`.
+
+A documentação interativa fica em `http://localhost:8080/swagger-ui.html` (veja [Documentação Swagger/OpenAPI](#documentação-swaggeropenapi)).
 
 Para rodar os testes: pelo IntelliJ, clique com o botão direito em `src/test/java` e escolha **Run 'All Tests'**; pelo terminal, `./mvnw test`. Mais detalhes em [Testes automatizados](#testes-automatizados).
 
@@ -165,7 +168,7 @@ O código segue a arquitetura em camadas: o controller recebe a requisição, o 
 
 ```text
 src/main/java/com/example/musica
-├── config        # SeedConfig com os dados iniciais
+├── config        # SeedConfig com os dados iniciais e OpenApiConfig (Swagger)
 ├── controller    # endpoints REST
 ├── dto           # records de entrada (RequestDto) e saída (ResponseDto)
 ├── exception     # exceções e ApiExceptionHandler
@@ -353,11 +356,35 @@ Outros exemplos:
 - `GET /avaliacoes?notaMinima=4.5&sort=nota,desc` – avaliações com nota 4,5 ou mais, da maior para a menor;
 - `GET /artistas?pais=brasil` – artistas do Brasil.
 
+## Documentação Swagger/OpenAPI
+
+> Requisito extra: **Swagger/OpenAPI (5%)**, issue [#1](https://github.com/gabrieldorodrigues/apirest-2026/issues/1).
+
+A documentação é gerada automaticamente pelo **springdoc-openapi** a partir dos controllers e DTOs. Com a API rodando:
+
+| Endereço | O que é |
+| --- | --- |
+| `http://localhost:8080/swagger-ui.html` | Swagger UI: lista todos os endpoints e permite testá-los pelo navegador (**Try it out**) |
+| `http://localhost:8080/v3/api-docs` | Especificação OpenAPI 3 em JSON, que pode ser importada no Postman ou em outras ferramentas |
+
+O que está documentado:
+
+- **Seções na ordem do domínio:** Artistas, Gêneros, Álbuns, Músicas, Usuários e Avaliações (`@Tag`);
+- **Cada operação** tem resumo e descrição com as regras de negócio (`@Operation`). Por exemplo, `POST /avaliacoes` explica que a avaliação é de um álbum **ou** de uma música, que a nota vai de 0,5 a 5 em passos de 0,5 e que cada usuário avalia o mesmo item uma vez só;
+- **Respostas possíveis de cada endpoint** (`@ApiResponse`): 200/201/204 e os erros 400, 404, 409 e 422 que aquele endpoint pode retornar. Todos os erros mostram o corpo **Problem Details** (`application/problem+json`) com um exemplo do próprio caso;
+- **Filtros, paginação e ordenação** (`page`, `size`, `sort`) aparecem como parâmetros, com descrição e exemplo (`@Parameter` e `@ParameterObject`);
+- **DTOs de entrada** com exemplos que usam os dados do seed (`@Schema`). O **Try it out** já abre com um corpo válido: em `POST /avaliacoes`, o exemplo cria a avaliação do João para o OK Computer (201), e executar de novo retorna 409;
+- **Validações** (`@NotNull`, `@Size`, `@DecimalMin`, `@DecimalMax`...) aparecem no schema como campos obrigatórios, mínimos e máximos.
+
+A configuração fica em `OpenApiConfig` (título, descrição, versão, ordem das seções e o schema de erro) e em `application.properties` (`springdoc.*`).
+
+Evidências: [15-swagger-ui](evidencias/15-swagger-ui.png) e [16-swagger-try-it-out](evidencias/16-swagger-try-it-out.png).
+
 ## Testes automatizados
 
 > Requisito extra: **Testes automatizados (5%)**, issue [#5](https://github.com/gabrieldorodrigues/apirest-2026/issues/5).
 
-São 40 testes de integração com JUnit 5, `@SpringBootTest` e `MockMvc`. Cada teste faz uma requisição HTTP de verdade para a API e confere o status, o corpo e o formato Problem Details dos erros. Os testes não usam mocks: passam pelo controller, pelo service, pelo repository e pelo banco.
+São 42 testes de integração com JUnit 5, `@SpringBootTest` e `MockMvc`. Cada teste faz uma requisição HTTP de verdade para a API e confere o status, o corpo e o formato Problem Details dos erros. Os testes não usam mocks: passam pelo controller, pelo service, pelo repository e pelo banco.
 
 - O banco é um H2 **em memória** (`jdbc:h2:mem:api-teste`), separado do `./data` usado no dia a dia;
 - O `SeedConfig` carrega os mesmos dados de exemplo, então os testes usam os álbuns, músicas e usuários do seed;
@@ -368,6 +395,7 @@ São 40 testes de integração com JUnit 5, `@SpringBootTest` e `MockMvc`. Cada 
 | `AvaliacaoControllerTest` | CRUD de avaliação; recálculo da `notaMedia`; 409 por avaliação repetida de álbum e de música; editar a própria avaliação não conta como repetida; 422 para álbum e música ao mesmo tempo, sem nenhum dos dois e nota fora do passo de 0,5; 400 para nota fora de 0,5 a 5 e campos obrigatórios; 404 para usuário inexistente; histórico por `usuarioId`; filtro `notaMinima` com ordenação |
 | `AlbumControllerTest` | CRUD de álbum; `notaMedia` calculada; 409 ao remover álbum com músicas; 404 em Problem Details; 404 para gênero inexistente no corpo; 400 com a lista de campos inválidos; filtro por artista e gênero com paginação e ordenação; 400 para `sort` inválido |
 | `CatalogoRegrasTest` | E-mail salvo em minúsculo e 409 por e-mail repetido; 400 de validação do usuário; faixa repetida no mesmo álbum (409) e permitida em outro álbum; músicas ordenadas pela faixa; 409 ao remover usuário, música, artista e gênero com dependentes; filtro de artistas por país; 400 para id inválido na rota e JSON com tipo errado |
+| `OpenApiDocsTest` | `/v3/api-docs` descreve a API, os 6 recursos e os erros em Problem Details; `/swagger-ui.html` abre a Swagger UI |
 | `MusicaApplicationTests` | A aplicação sobe sem erros |
 
 Para rodar:
@@ -397,3 +425,5 @@ Prints da API rodando localmente, tirados no Postman e no console do H2. A colle
 | [12-banco-h2](evidencias/12-banco-h2.png) | Dados salvos no H2, com álbuns, artistas e gêneros |
 | [13-run-collection](evidencias/13-run-collection.png) | Todas as requisições da collection rodadas em sequência |
 | [14-testes](evidencias/14-testes.png) | Os 40 testes automatizados passando no IntelliJ |
+| [15-swagger-ui](evidencias/15-swagger-ui.png) | Swagger UI com título, descrição e os endpoints agrupados por recurso |
+| [16-swagger-try-it-out](evidencias/16-swagger-try-it-out.png) | `GET /artistas/1` executado pelo **Try it out** da Swagger UI (200) |
