@@ -1,4 +1,4 @@
-# Gera a documentação com MkDocs e publica no GitHub Pages.
+# Gera a documentação com MkDocs, junto com a Swagger UI da API, e publica no GitHub Pages.
 # Em pull requests só gera (--strict falha com link ou página quebrada); na main também publica.
 name: Documentação
 
@@ -12,6 +12,9 @@ on:
       - "mkdocs-hooks/**"
       - "requirements-docs.txt"
       - ".github/workflows/docs.yml"
+      # a especificação da Swagger UI sai dos controllers e DTOs
+      - "src/main/**"
+      - "pom.xml"
   pull_request:
     paths:
       - "docs/**"
@@ -20,6 +23,9 @@ on:
       - "mkdocs-hooks/**"
       - "requirements-docs.txt"
       - ".github/workflows/docs.yml"
+      # a especificação da Swagger UI sai dos controllers e DTOs
+      - "src/main/**"
+      - "pom.xml"
   workflow_dispatch:
 
 permissions:
@@ -37,6 +43,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+
+      # grava target/openapi.json; o hook mkdocs-hooks/swagger.py publica o arquivo em /swagger/
+      - name: Gerar especificação OpenAPI
+        run: ./mvnw -B test -Dtest=OpenApiDocsTest
 
       - uses: actions/setup-python@v5
         with:

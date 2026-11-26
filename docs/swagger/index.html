@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Swagger UI · API de Avaliação Musical</title>
+  <link rel="icon" href="../assets/favicon.svg">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css">
+  <style>
+    body { margin: 0; font-family: sans-serif; }
+    .aviso { background: #673ab7; color: #fff; padding: 12px 20px; font-size: 14px; line-height: 1.5; }
+    .aviso a { color: #ffd54f; }
+    .aviso code { background: rgba(255, 255, 255, .15); padding: 1px 4px; border-radius: 3px; }
+  </style>
+</head>
+<body>
+  <div class="aviso">
+    <strong>Referência da API de Avaliação Musical</strong>, gerada a partir do código da <code>main</code>.
+    O <strong>Try it out</strong> chama a API em <code>http://localhost:8080</code>: suba a API antes
+    (<a href="../executar/">Como executar</a>).
+    · <a href="../">Voltar para a documentação</a>
+  </div>
+  <div id="swagger-ui"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+  <script>
+    fetch("openapi.json")
+      .then((resposta) => resposta.json())
+      .then((spec) => {
+        // a especificação é gerada nos testes, sem porta; o Try it out usa a API rodando na máquina
+        spec.servers = [{ url: "http://localhost:8080", description: "API rodando localmente (Docker ou ./mvnw spring-boot:run)" }];
+        SwaggerUIBundle({
+          spec,
+          dom_id: "#swagger-ui",
+          deepLinking: true,
+          operationsSorter: "method",
+          tryItOutEnabled: true,
+        });
+      })
+      .catch(() => {
+        document.getElementById("swagger-ui").innerHTML =
+          "<p style='padding: 20px'>Especificação não encontrada. Rode <code>./mvnw test</code> antes de gerar o site.</p>";
+      });
+  </script>
+</body>
+</html>

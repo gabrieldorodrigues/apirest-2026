@@ -8,7 +8,7 @@ O repositório tem dois workflows no **GitHub Actions**:
 | Workflow | Arquivo | Quando roda | O que faz |
 | --- | --- | --- | --- |
 | **CI** | `.github/workflows/ci.yml` | Todo pull request e todo push na `main` | Compila, roda os testes e gera a imagem Docker. Na `main`, publica a imagem no GitHub Container Registry |
-| **Documentação** | `.github/workflows/docs.yml` | Mudança em `docs/`, `evidencias/` ou `mkdocs.yml` | Gera o site com MkDocs. Na `main`, publica no GitHub Pages |
+| **Documentação** | `.github/workflows/docs.yml` | Mudança em `docs/`, `evidencias/`, `mkdocs.yml` ou no código da API | Gera a especificação OpenAPI e o site com MkDocs e a [Swagger UI](swagger.md#swagger-ui-no-github-pages). Na `main`, publica no GitHub Pages |
 
 ```mermaid
 flowchart LR
