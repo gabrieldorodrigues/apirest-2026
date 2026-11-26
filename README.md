@@ -143,7 +143,7 @@ Pré-requisito: JDK 17 ou superior instalado.
 
 A API sobe em `http://localhost:8080`. Na primeira execução o banco é criado em `./data/` e um seed cadastra gêneros, artistas, álbuns, músicas, usuários e avaliações de exemplo. Para voltar ao estado inicial, é só apagar a pasta `data/`.
 
-Para rodar os testes: pelo IntelliJ, rode a classe `MusicaApplicationTests`; pelo terminal, `./mvnw test`.
+Para rodar os testes: pelo IntelliJ, clique com o botão direito em `src/test/java` e escolha **Run 'All Tests'**; pelo terminal, `./mvnw test`. Mais detalhes em [Testes automatizados](#testes-automatizados).
 
 ### Variáveis de ambiente
 
@@ -353,6 +353,30 @@ Outros exemplos:
 - `GET /avaliacoes?notaMinima=4.5&sort=nota,desc` – avaliações com nota 4,5 ou mais, da maior para a menor;
 - `GET /artistas?pais=brasil` – artistas do Brasil.
 
+## Testes automatizados
+
+> Requisito extra: **Testes automatizados (5%)**, issue [#5](https://github.com/gabrieldorodrigues/apirest-2026/issues/5).
+
+São 40 testes de integração com JUnit 5, `@SpringBootTest` e `MockMvc`. Cada teste faz uma requisição HTTP de verdade para a API e confere o status, o corpo e o formato Problem Details dos erros. Os testes não usam mocks: passam pelo controller, pelo service, pelo repository e pelo banco.
+
+- O banco é um H2 **em memória** (`jdbc:h2:mem:api-teste`), separado do `./data` usado no dia a dia;
+- O `SeedConfig` carrega os mesmos dados de exemplo, então os testes usam os álbuns, músicas e usuários do seed;
+- A classe base `ApiTestBase` é `@Transactional`: cada teste é desfeito no final, e um teste não afeta o outro.
+
+| Classe | O que cobre |
+| --- | --- |
+| `AvaliacaoControllerTest` | CRUD de avaliação; recálculo da `notaMedia`; 409 por avaliação repetida de álbum e de música; editar a própria avaliação não conta como repetida; 422 para álbum e música ao mesmo tempo, sem nenhum dos dois e nota fora do passo de 0,5; 400 para nota fora de 0,5 a 5 e campos obrigatórios; 404 para usuário inexistente; histórico por `usuarioId`; filtro `notaMinima` com ordenação |
+| `AlbumControllerTest` | CRUD de álbum; `notaMedia` calculada; 409 ao remover álbum com músicas; 404 em Problem Details; 404 para gênero inexistente no corpo; 400 com a lista de campos inválidos; filtro por artista e gênero com paginação e ordenação; 400 para `sort` inválido |
+| `CatalogoRegrasTest` | E-mail salvo em minúsculo e 409 por e-mail repetido; 400 de validação do usuário; faixa repetida no mesmo álbum (409) e permitida em outro álbum; músicas ordenadas pela faixa; 409 ao remover usuário, música, artista e gênero com dependentes; filtro de artistas por país; 400 para id inválido na rota e JSON com tipo errado |
+| `MusicaApplicationTests` | A aplicação sobe sem erros |
+
+Para rodar:
+
+- **IntelliJ:** botão direito em `src/test/java` → **Run 'All Tests'**;
+- **Terminal:** `./mvnw test`.
+
+Evidência: [14-testes](evidencias/14-testes.png).
+
 ## Evidências
 
 Prints da API rodando localmente, tirados no Postman e no console do H2. A collection usada está em [postman/collections/apirest-2026](postman/collections/apirest-2026).
@@ -372,3 +396,4 @@ Prints da API rodando localmente, tirados no Postman e no console do H2. A colle
 | [11-regra-negocio-422](evidencias/11-regra-negocio-422.png) | Avaliação de álbum e música ao mesmo tempo (422) |
 | [12-banco-h2](evidencias/12-banco-h2.png) | Dados salvos no H2, com álbuns, artistas e gêneros |
 | [13-run-collection](evidencias/13-run-collection.png) | Todas as requisições da collection rodadas em sequência |
+| [14-testes](evidencias/14-testes.png) | Os 40 testes automatizados passando no IntelliJ |
