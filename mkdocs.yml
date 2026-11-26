@@ -48,9 +48,11 @@ plugins:
   - search:
       lang: pt
 
-# publica as imagens da pasta evidencias/ da raiz no site, sem copiar os arquivos para docs/
+# publica as imagens da pasta evidencias/ da raiz no site, sem copiar os arquivos para docs/,
+# e a especificação OpenAPI gerada pelos testes (target/openapi.json) ao lado da Swagger UI
 hooks:
   - mkdocs-hooks/evidencias.py
+  - mkdocs-hooks/swagger.py
 
 extra_css:
   - assets/extra.css
@@ -105,6 +107,7 @@ nav:
       - Endpoints e DTOs: api/endpoints.md
       - Paginação, filtros e ordenação: api/listagens.md
       - Validação e erros: api/erros.md
+      - Swagger UI: /apirest-2026/swagger/
   - Requisitos extras:
       - extras/index.md
       - Testes automatizados: extras/testes.md
