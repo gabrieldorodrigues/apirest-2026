@@ -127,6 +127,7 @@ classDiagram
 - Java 17
 - Spring Boot 4.1.1 (Web MVC, Data JPA, Validation)
 - springdoc-openapi 3.1.1 (Swagger UI e OpenAPI 3)
+- Spring Boot Actuator e Micrometer (health check, informações e métricas)
 - H2 Database em arquivo (`./data/musica`)
 - Maven
 
@@ -168,7 +169,7 @@ O código segue a arquitetura em camadas: o controller recebe a requisição, o 
 
 ```text
 src/main/java/com/example/musica
-├── config        # SeedConfig com os dados iniciais e OpenApiConfig (Swagger)
+├── config        # SeedConfig com os dados iniciais, OpenApiConfig (Swagger) e RequestLoggingFilter (log das requisições)
 ├── controller    # endpoints REST
 ├── dto           # records de entrada (RequestDto) e saída (ResponseDto)
 ├── exception     # exceções e ApiExceptionHandler
@@ -380,11 +381,55 @@ A configuração fica em `OpenApiConfig` (título, descrição, versão, ordem d
 
 Evidências: [15-swagger-ui](evidencias/15-swagger-ui.png) e [16-swagger-try-it-out](evidencias/16-swagger-try-it-out.png).
 
+## Observabilidade
+
+> Requisito extra: **Observabilidade: health check, Actuator, métricas e logs (5%)**, issue [#2](https://github.com/gabrieldorodrigues/apirest-2026/issues/2).
+
+A API usa o **Spring Boot Actuator** com **Micrometer**. Com a API rodando:
+
+| Endpoint | O que mostra |
+| --- | --- |
+| `GET /actuator/health` | Situação da API (`UP`/`DOWN`) com os detalhes de cada componente: banco (`db`), disco (`diskSpace`), `liveness` e `readiness` |
+| `GET /actuator/info` | Nome, descrição e repositório da API; versão e data do build; versão do Java e sistema operacional |
+| `GET /actuator/metrics` | Lista de todas as métricas disponíveis |
+| `GET /actuator/metrics/{nome}` | Valor de uma métrica. Aceita filtro por tag, ex.: `?tag=tipo:album` |
+
+Só esses endpoints ficam expostos (`management.endpoints.web.exposure.include=health,info,metrics`).
+
+### Métricas
+
+Além das métricas automáticas, como `http.server.requests` (requisições por rota, status e tempo), `jvm.memory.used` e `hikaricp.connections.active`, a API registra duas métricas do domínio no `AvaliacaoService`:
+
+| Métrica | Tipo | O que mede |
+| --- | --- | --- |
+| `musica.avaliacoes.criadas` | Counter, com a tag `tipo` (`album` ou `musica`) | Avaliações criadas desde que a API subiu. Avaliações recusadas (400, 409, 422) não contam |
+| `musica.avaliacoes.total` | Gauge | Total de avaliações no banco no momento da consulta |
+
+Exemplos:
+
+- `GET /actuator/metrics/musica.avaliacoes.criadas?tag=tipo:album` – avaliações de álbum criadas;
+- `GET /actuator/metrics/http.server.requests?tag=uri:/avaliacoes&tag=status:409` – quantas vezes `/avaliacoes` respondeu 409.
+
+### Logs
+
+Os logs usam SLF4J/Logback e saem no console e no arquivo `logs/musica.log`. O arquivo tem rotação automática e fica fora do Git.
+
+| Origem | Nível | Exemplo |
+| --- | --- | --- |
+| `RequestLoggingFilter` (toda requisição da API) | INFO; WARN para 4xx | `POST /avaliacoes -> 201 (18 ms)` |
+| `AvaliacaoService` (criar, atualizar, remover) | INFO | `Avaliação 10 criada: usuário 3 avaliou album 1 com nota 4.5` |
+| `AvaliacaoService` (regras violadas) | WARN | `Avaliação recusada (409): usuário 1 já avaliou o álbum 1` |
+| `ApiExceptionHandler` (erro inesperado) | ERROR, com stack trace | O cliente recebe só o 500 em Problem Details, sem detalhes internos |
+
+As requisições do Actuator, do Swagger e do console do H2 não entram no log de requisições. Os testes automatizados logam só no console, sem escrever no `logs/musica.log`.
+
+Evidências: [17-actuator-health](evidencias/17-actuator-health.png), [18-actuator-metricas](evidencias/18-actuator-metricas.png) e [19-logs](evidencias/19-logs.png).
+
 ## Testes automatizados
 
 > Requisito extra: **Testes automatizados (5%)**, issue [#5](https://github.com/gabrieldorodrigues/apirest-2026/issues/5).
 
-São 42 testes de integração com JUnit 5, `@SpringBootTest` e `MockMvc`. Cada teste faz uma requisição HTTP de verdade para a API e confere o status, o corpo e o formato Problem Details dos erros. Os testes não usam mocks: passam pelo controller, pelo service, pelo repository e pelo banco.
+São 48 testes de integração com JUnit 5, `@SpringBootTest` e `MockMvc`. Cada teste faz uma requisição HTTP de verdade para a API e confere o status, o corpo e o formato Problem Details dos erros. Os testes não usam mocks: passam pelo controller, pelo service, pelo repository e pelo banco.
 
 - O banco é um H2 **em memória** (`jdbc:h2:mem:api-teste`), separado do `./data` usado no dia a dia;
 - O `SeedConfig` carrega os mesmos dados de exemplo, então os testes usam os álbuns, músicas e usuários do seed;
@@ -396,6 +441,7 @@ São 42 testes de integração com JUnit 5, `@SpringBootTest` e `MockMvc`. Cada 
 | `AlbumControllerTest` | CRUD de álbum; `notaMedia` calculada; 409 ao remover álbum com músicas; 404 em Problem Details; 404 para gênero inexistente no corpo; 400 com a lista de campos inválidos; filtro por artista e gênero com paginação e ordenação; 400 para `sort` inválido |
 | `CatalogoRegrasTest` | E-mail salvo em minúsculo e 409 por e-mail repetido; 400 de validação do usuário; faixa repetida no mesmo álbum (409) e permitida em outro álbum; músicas ordenadas pela faixa; 409 ao remover usuário, música, artista e gênero com dependentes; filtro de artistas por país; 400 para id inválido na rota e JSON com tipo errado |
 | `OpenApiDocsTest` | `/v3/api-docs` descreve a API, os 6 recursos e os erros em Problem Details; `/swagger-ui.html` abre a Swagger UI |
+| `ObservabilidadeTest` | `/actuator/health` UP com banco e disco; `/actuator/info` com o nome da API; `/actuator/metrics` com métricas HTTP, da JVM e do domínio; `musica.avaliacoes.criadas` aumenta ao criar e não muda numa avaliação recusada (409); `musica.avaliacoes.total` igual ao número de avaliações |
 | `MusicaApplicationTests` | A aplicação sobe sem erros |
 
 Para rodar:
@@ -427,3 +473,6 @@ Prints da API rodando localmente, tirados no Postman e no console do H2. A colle
 | [14-testes](evidencias/14-testes.png) | Os 40 testes automatizados passando no IntelliJ |
 | [15-swagger-ui](evidencias/15-swagger-ui.png) | Swagger UI com título, descrição e os endpoints agrupados por recurso |
 | [16-swagger-try-it-out](evidencias/16-swagger-try-it-out.png) | `GET /artistas/1` executado pelo **Try it out** da Swagger UI (200) |
+| [17-actuator-health](evidencias/17-actuator-health.png) | `GET /actuator/health` com status `UP` e detalhes do banco e do disco |
+| [18-actuator-metricas](evidencias/18-actuator-metricas.png) | Métrica `musica.avaliacoes.criadas?tag=tipo:album` com 1 avaliação criada |
+| [19-logs](evidencias/19-logs.png) | `logs/musica.log` com a API rodando: avaliação criada (log do service) e `POST /avaliacoes -> 201` (log das requisições) |
