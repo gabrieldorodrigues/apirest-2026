@@ -41,7 +41,7 @@ Todos os recursos têm as mesmas cinco operações:
 
     ---
 
-    Collection com listagens, CRUD, erros e remoções, organizada em pastas.
+    Collection com listagens, CRUD, erros, remoções e o relatório por período, organizada em pastas.
 
     [`postman/collections/apirest-2026`](https://github.com/gabrieldorodrigues/apirest-2026/tree/main/postman/collections/apirest-2026)
 

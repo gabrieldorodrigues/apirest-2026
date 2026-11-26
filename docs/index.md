@@ -42,7 +42,7 @@ Projeto final da disciplina de API REST · Tema **Entretenimento e Cultura**.
 
     ---
 
-    Testes, Swagger, observabilidade, PostgreSQL, Docker e load balancer.
+    Testes, Swagger, observabilidade, PostgreSQL, Docker, load balancer e CI/CD.
 
     [:octicons-arrow-right-24: Extras](extras/index.md)
 

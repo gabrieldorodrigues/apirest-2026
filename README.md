@@ -487,7 +487,7 @@ Exemplo com o seed, que grava as avaliações entre setembro e novembro de 2026 
 }
 ```
 
-Com `inicio=2026-10-01&fim=2026-10-31`, o total cai para 3, todas de álbuns. Com um período sem avaliações, a resposta é 200 com as contagens zeradas.
+Com `inicio=2026-10-01&fim=2026-10-31`, o total cai para 3, todas de álbuns. Com um período sem avaliações, a resposta é 200 com as contagens zeradas. A pasta **05 - Relatório por período** da collection do Postman tem os períodos e os erros prontos para rodar.
 
 | Erro | Quando acontece |
 | --- | --- |

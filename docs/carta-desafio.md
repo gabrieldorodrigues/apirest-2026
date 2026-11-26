@@ -197,7 +197,7 @@ O teste `numeroFixoDeConsultas` conta os comandos SQL com as estatísticas do Hi
 5. Use `inicio=2026-13-01` e confira o 400.
 6. Crie uma avaliação com `POST /avaliacoes` e consulte o relatório do dia de hoje: o total aumenta em 1.
 
-Os mesmos passos funcionam pela [Swagger UI](/apirest-2026/swagger/), na seção **Relatórios**.
+Os mesmos passos funcionam pela [Swagger UI](/apirest-2026/swagger/), na seção **Relatórios**, e pela collection do Postman, na pasta **05 - Relatório por período**.
 
 ## Testes
 
