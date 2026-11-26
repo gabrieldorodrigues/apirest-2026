@@ -10,7 +10,8 @@ Os requisitos extras valem até **20%** da nota. Cada um foi feito numa issue e 
 | SGBD diferente do H2 (PostgreSQL) | 5% | [#3](https://github.com/gabrieldorodrigues/apirest-2026/issues/3) | [#9](https://github.com/gabrieldorodrigues/apirest-2026/pull/9) | [PostgreSQL](postgresql.md) |
 | Docker/Compose | 5% | [#4](https://github.com/gabrieldorodrigues/apirest-2026/issues/4) | [#10](https://github.com/gabrieldorodrigues/apirest-2026/pull/10) | [Docker](docker.md) |
 | Load balancer/múltiplas instâncias | 10% | [#11](https://github.com/gabrieldorodrigues/apirest-2026/issues/11) | [#12](https://github.com/gabrieldorodrigues/apirest-2026/pull/12) | [Load balancer](load-balancer.md) |
-| **Total implementado** | **35%** | | | limite de 20% na nota |
+| CI/CD | 5% | [#16](https://github.com/gabrieldorodrigues/apirest-2026/issues/16) | [#17](https://github.com/gabrieldorodrigues/apirest-2026/pull/17) | [CI/CD](ci-cd.md) |
+| **Total implementado** | **40%** | | | limite de 20% na nota |
 
 ## Como os extras se conectam
 
@@ -23,13 +24,17 @@ flowchart LR
     O --> P[PostgreSQL]
     P --> D[Docker/<br/>Compose]
     D --> L[Load balancer]
+    L --> C[CI/CD]
 
     T -. "garantem que nada quebra" .-> P
     O -. "/actuator/health usado nos healthchecks" .-> D
     O -. "header X-Instancia e /actuator/info" .-> L
     P -. "banco compartilhado pelas instâncias" .-> L
+    T -. "rodam em todo pull request" .-> C
+    D -. "Dockerfile da imagem publicada" .-> C
 ```
 
 - Os **testes** passaram a rodar também contra o PostgreSQL (Testcontainers), garantindo que a troca de banco não quebrou nada.
 - O **health check** da observabilidade é o que o Docker usa para saber se cada container está pronto.
 - O **PostgreSQL** é o estado compartilhado que permite rodar várias instâncias atrás do **load balancer**.
+- O **CI/CD** roda os testes em todo pull request e publica a imagem do mesmo `Dockerfile` usado pelo compose.
