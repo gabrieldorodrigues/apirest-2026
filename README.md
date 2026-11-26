@@ -148,19 +148,20 @@ Pré-requisito: [Docker Desktop](https://www.docker.com/products/docker-desktop/
 docker compose up --build
 ```
 
-O `docker-compose.yml` sobe dois serviços:
+O `docker-compose.yml` sobe três serviços:
 
 | Serviço | Imagem | Porta | O que faz |
 | --- | --- | --- | --- |
 | `db` (`musica-db`) | `postgres:17-alpine` | 5432 | PostgreSQL com os dados no volume `musica-pgdata` |
-| `api` (`musica-api`) | construída pelo `Dockerfile` | 8080 | A API com o profile `postgres`, conectada ao serviço `db` |
+| `api` (3 réplicas: `apirest-2026-api-1`, `-2`, `-3`) | construída pelo `Dockerfile` | só interna (8080) | A API com o profile `postgres`, conectada ao serviço `db` |
+| `lb` (`musica-lb`) | `nginx:1.28-alpine` | 8080 | Load balancer: recebe as requisições e distribui entre as réplicas da `api` (veja [Load balancer e múltiplas instâncias](#load-balancer-e-múltiplas-instâncias)) |
 
 Como funciona:
 
 - O **`Dockerfile`** é *multi-stage*. A primeira etapa compila o `.jar` com Maven e JDK 17. A imagem final leva só o JRE 17 (Alpine) e o `.jar`, roda com um usuário sem root e tem um `HEALTHCHECK` que consulta o `/actuator/health`;
-- A API só sobe depois que o PostgreSQL aceita conexões (`depends_on` com `condition: service_healthy` e `pg_isready` no `db`);
-- `docker compose ps` mostra os dois serviços como `healthy`;
-- Os dados ficam no volume `musica-pgdata` e sobrevivem a um `docker compose down`. Os logs da API ficam no volume `musica-logs`;
+- A API só sobe depois que o PostgreSQL aceita conexões (`depends_on` com `condition: service_healthy` e `pg_isready` no `db`), e o Nginx só sobe depois que as réplicas da API estão `healthy`;
+- `docker compose ps` mostra todos os serviços como `healthy`;
+- Os dados ficam no volume `musica-pgdata` e sobrevivem a um `docker compose down`. Os logs da API ficam no volume `musica-logs`, um arquivo por réplica;
 - Os containers usam o fuso `America/Sao_Paulo`.
 
 Comandos úteis:
@@ -173,7 +174,7 @@ docker compose down -v                # para tudo e apaga os dados (o seed roda 
 docker exec -it musica-db psql -U musica -d musica   # entra no PostgreSQL
 ```
 
-Para trocar as portas ou as credenciais, copie o `.env.example` para `.env` e ajuste `API_PORT`, `DB_PORT`, `POSTGRES_DB`, `POSTGRES_USER` e `POSTGRES_PASSWORD`. Por exemplo, `API_PORT=8081` se a 8080 já estiver em uso.
+Para trocar as portas, as credenciais ou o número de réplicas, copie o `.env.example` para `.env` e ajuste `API_PORT`, `DB_PORT`, `API_REPLICAS`, `POSTGRES_DB`, `POSTGRES_USER` e `POSTGRES_PASSWORD`. Por exemplo, `API_PORT=8081` se a 8080 já estiver em uso.
 
 Evidência: [23-docker-compose-ps](evidencias/23-docker-compose-ps.png).
 
@@ -247,7 +248,7 @@ O código segue a arquitetura em camadas: o controller recebe a requisição, o 
 
 ```text
 src/main/java/com/example/musica
-├── config        # SeedConfig com os dados iniciais, OpenApiConfig (Swagger) e RequestLoggingFilter (log das requisições)
+├── config        # SeedConfig com os dados iniciais, OpenApiConfig (Swagger), RequestLoggingFilter (log das requisições) e InstanciaFilter (header X-Instancia)
 ├── controller    # endpoints REST
 ├── dto           # records de entrada (RequestDto) e saída (ResponseDto)
 ├── exception     # exceções e ApiExceptionHandler
@@ -257,7 +258,7 @@ src/main/java/com/example/musica
 └── service       # regras de negócio
 ```
 
-Na raiz ficam o `Dockerfile`, o `docker-compose.yml` e o `.env.example` (veja [Executar com Docker](#executar-com-docker)).
+Na raiz ficam o `Dockerfile`, o `docker-compose.yml`, o `.env.example` e a configuração do Nginx em `nginx/nginx.conf` (veja [Executar com Docker](#executar-com-docker)).
 
 ## Endpoints
 
@@ -505,11 +506,56 @@ As requisições do Actuator, do Swagger e do console do H2 não entram no log d
 
 Evidências: [17-actuator-health](evidencias/17-actuator-health.png), [18-actuator-metricas](evidencias/18-actuator-metricas.png) e [19-logs](evidencias/19-logs.png).
 
+## Load balancer e múltiplas instâncias
+
+> Requisito extra: **Load balancer/múltiplas instâncias (10%)**, issue [#11](https://github.com/gabrieldorodrigues/apirest-2026/issues/11).
+
+Com `docker compose up --build`, a API roda em **3 instâncias** atrás de um **Nginx**:
+
+```text
+                          ┌──> api-1 ──┐
+cliente ──> lb (Nginx) ───┼──> api-2 ──┼──> db (PostgreSQL)
+        localhost:8080    └──> api-3 ──┘
+```
+
+- **Distribuição (round-robin):** o Nginx (`nginx/nginx.conf`) manda cada requisição para a próxima réplica. Só ele fica exposto na porta 8080; as réplicas não publicam porta;
+- **Descoberta das réplicas:** o nome `api` resolve para o IP de cada réplica no DNS interno do Docker. O Nginx reconsulta a cada 5 s (`resolve`), então acompanha réplicas que caem, voltam ou trocam de IP;
+- **Failover:** se uma réplica não responde, o Nginx tenta a próxima (`proxy_next_upstream`). Parar uma instância não derruba a API;
+- **Estado compartilhado no banco:** a API não guarda sessão em memória, então qualquer réplica atende qualquer requisição. As três usam o mesmo PostgreSQL: uma avaliação criada por uma réplica aparece nas outras, e as regras (avaliação repetida, faixa repetida) continuam valendo porque são checadas no banco;
+- **Seed seguro:** as três réplicas sobem juntas com o banco vazio. O `SeedConfig` usa um lock do PostgreSQL (`pg_advisory_xact_lock`): a primeira grava os dados de exemplo, e as outras esperam e encontram o banco já populado. Nada é duplicado;
+- **Identificação da instância:** toda resposta traz o header **`X-Instancia`** com o hostname do container que atendeu (`InstanciaFilter`). O mesmo id aparece em `GET /actuator/info` (`instancia.id` e `instancia.iniciadaEm`). Cada réplica grava o próprio log (`logs/musica-<hostname>.log`), e `docker compose logs api` mostra os logs com o prefixo `api-1`, `api-2` e `api-3`;
+- **Quantidade de réplicas:** `API_REPLICAS` no `.env` (padrão 3), ou `docker compose up -d --scale api=5`.
+
+Para ver o balanceamento:
+
+```bash
+# cada resposta vem de uma instância diferente, em rodízio
+curl -s -D - -o /dev/null http://localhost:8080/albuns | grep X-Instancia
+```
+
+No PowerShell:
+
+```powershell
+1..6 | % { (curl.exe -s -D - -o NUL http://localhost:8080/albuns | Select-String "X-Instancia").Line }
+```
+
+Para ver o failover:
+
+```bash
+docker stop apirest-2026-api-2     # derruba uma instância
+# as requisições continuam respondendo 200, agora alternando entre api-1 e api-3
+docker start apirest-2026-api-2    # ela volta para o rodízio quando fica healthy
+```
+
+Métricas com várias instâncias: `musica.avaliacoes.criadas` é contada por instância, porque cada réplica tem o próprio Micrometer; `musica.avaliacoes.total` lê do banco e é igual em todas.
+
+Evidências: [24-lb-compose-ps](evidencias/24-lb-compose-ps.png), [25-lb-balanceamento](evidencias/25-lb-balanceamento.png) e [26-lb-failover](evidencias/26-lb-failover.png).
+
 ## Testes automatizados
 
 > Requisito extra: **Testes automatizados (5%)**, issue [#5](https://github.com/gabrieldorodrigues/apirest-2026/issues/5).
 
-São 54 testes de integração com JUnit 5, `@SpringBootTest` e `MockMvc`. Cada teste faz uma requisição HTTP de verdade para a API e confere o status, o corpo e o formato Problem Details dos erros. Os testes não usam mocks: passam pelo controller, pelo service, pelo repository e pelo banco.
+São 56 testes de integração com JUnit 5, `@SpringBootTest` e `MockMvc`. Cada teste faz uma requisição HTTP de verdade para a API e confere o status, o corpo e o formato Problem Details dos erros. Os testes não usam mocks: passam pelo controller, pelo service, pelo repository e pelo banco.
 
 - O banco é um H2 **em memória** (`jdbc:h2:mem:api-teste`), separado do `./data` usado no dia a dia. A exceção é o `PostgresIntegracaoTest`, que usa um PostgreSQL de verdade;
 - O `SeedConfig` carrega os mesmos dados de exemplo, então os testes usam os álbuns, músicas e usuários do seed;
@@ -521,8 +567,8 @@ São 54 testes de integração com JUnit 5, `@SpringBootTest` e `MockMvc`. Cada 
 | `AlbumControllerTest` | CRUD de álbum; `notaMedia` calculada; 409 ao remover álbum com músicas; 404 em Problem Details; 404 para gênero inexistente no corpo; 400 com a lista de campos inválidos; filtro por artista e gênero com paginação e ordenação; 400 para `sort` inválido |
 | `CatalogoRegrasTest` | E-mail salvo em minúsculo e 409 por e-mail repetido; 400 de validação do usuário; faixa repetida no mesmo álbum (409) e permitida em outro álbum; músicas ordenadas pela faixa; 409 ao remover usuário, música, artista e gênero com dependentes; filtro de artistas por país; 400 para id inválido na rota e JSON com tipo errado |
 | `OpenApiDocsTest` | `/v3/api-docs` descreve a API, os 6 recursos e os erros em Problem Details; `/swagger-ui.html` abre a Swagger UI |
-| `ObservabilidadeTest` | `/actuator/health` UP com banco e disco; `/actuator/info` com o nome da API; `/actuator/metrics` com métricas HTTP, da JVM e do domínio; `musica.avaliacoes.criadas` aumenta ao criar e não muda numa avaliação recusada (409); `musica.avaliacoes.total` igual ao número de avaliações |
-| `PostgresIntegracaoTest` | Com o profile `postgres` e um **PostgreSQL 17 criado pelo Testcontainers**: health mostra PostgreSQL; seed carregado e listagens sem filtro (parâmetros nulos); filtros combinados, LIKE sem diferenciar maiúsculas e ordenação; nota média com `avg` sobre `numeric`; criar avaliação (201) e repetir (409); e-mail e faixa repetidos (409); remoção com e sem dependentes. **Precisa do Docker rodando**; sem Docker, os 6 testes são pulados em vez de falhar |
+| `ObservabilidadeTest` | `/actuator/health` UP com banco e disco; `/actuator/info` com o nome da API; header `X-Instancia` em toda resposta, com o mesmo id do `/actuator/info`; `/actuator/metrics` com métricas HTTP, da JVM e do domínio; `musica.avaliacoes.criadas` aumenta ao criar e não muda numa avaliação recusada (409); `musica.avaliacoes.total` igual ao número de avaliações |
+| `PostgresIntegracaoTest` | Com o profile `postgres` e um **PostgreSQL 17 criado pelo Testcontainers**: health mostra PostgreSQL; seed carregado e listagens sem filtro (parâmetros nulos); rodar o seed de novo, como outra instância subindo, não duplica os dados (lock no banco); filtros combinados, LIKE sem diferenciar maiúsculas e ordenação; nota média com `avg` sobre `numeric`; criar avaliação (201) e repetir (409); e-mail e faixa repetidos (409); remoção com e sem dependentes. **Precisa do Docker rodando**; sem Docker, os 7 testes são pulados em vez de falhar |
 | `MusicaApplicationTests` | A aplicação sobe sem erros |
 
 Para rodar:
@@ -560,4 +606,7 @@ Prints da API rodando localmente, tirados no Postman e no console do H2. A colle
 | [20-postgres-health](evidencias/20-postgres-health.png) | API com o profile `postgres`: `/actuator/health` com `"database": "PostgreSQL"` |
 | [21-postgres-dados](evidencias/21-postgres-dados.png) | Tabelas criadas pelo Hibernate e álbuns do seed no PostgreSQL (`psql` no container) |
 | [22-testes-postgres](evidencias/22-testes-postgres.png) | `PostgresIntegracaoTest` passando contra o PostgreSQL 17 do Testcontainers |
-| [23-docker-compose-ps](evidencias/23-docker-compose-ps.png) | `docker compose ps` com `musica-api` e `musica-db` rodando e `healthy` |
+| [23-docker-compose-ps](evidencias/23-docker-compose-ps.png) | `docker compose ps` com `musica-api` e `musica-db` rodando e `healthy` (versão com uma instância, antes do load balancer) |
+| [24-lb-compose-ps](evidencias/24-lb-compose-ps.png) | `docker compose ps` com o Nginx (`musica-lb`), o PostgreSQL e as 3 instâncias da API `healthy` |
+| [25-lb-balanceamento](evidencias/25-lb-balanceamento.png) | Requisições seguidas pelo load balancer, com o header `X-Instancia` alternando entre as 3 instâncias |
+| [26-lb-failover](evidencias/26-lb-failover.png) | Failover: com a `api-2` parada, as requisições continuam com 200, alternando entre as outras 2 instâncias |
