@@ -1,0 +1,16 @@
+$kind: http-request
+method: POST
+url: '{{baseUrl}}/avaliacoes'
+order: 12000
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "usuarioId": 2,
+      "albumId": 5,
+      "musicaId": 10,
+      "nota": 3.0
+    }

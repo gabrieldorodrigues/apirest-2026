@@ -1,0 +1,9 @@
+$kind: http-request
+method: GET
+url: '{{baseUrl}}/artistas?pais=brasil&sort=nome'
+order: 5000
+queryParams:
+  - key: pais
+    value: 'brasil'
+  - key: sort
+    value: 'nome'

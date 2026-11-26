@@ -1,0 +1,5 @@
+$kind: collection
+name: apirest-2026 - API de Avaliação Musical
+variables:
+  - key: baseUrl
+    value: 'http://localhost:8080'

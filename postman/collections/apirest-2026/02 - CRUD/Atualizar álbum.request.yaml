@@ -1,0 +1,20 @@
+$kind: http-request
+method: PUT
+url: '{{baseUrl}}/albuns/5'
+order: 6000
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "titulo": "Tim Maia Racional Vol. 1",
+      "anoLancamento": 1975,
+      "capaUrl": "https://exemplo.com/racional.jpg",
+      "artistaId": 5,
+      "generoIds": [
+        3,
+        6
+      ]
+    }

@@ -1,0 +1,7 @@
+$kind: http-request
+method: GET
+url: '{{baseUrl}}/albuns?sort=xpto'
+order: 5000
+queryParams:
+  - key: sort
+    value: 'xpto'

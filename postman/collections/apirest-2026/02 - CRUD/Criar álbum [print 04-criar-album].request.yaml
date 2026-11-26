@@ -1,0 +1,19 @@
+$kind: http-request
+method: POST
+url: '{{baseUrl}}/albuns'
+order: 5000
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "titulo": "Racional Vol. 1",
+      "anoLancamento": 1975,
+      "artistaId": 5,
+      "generoIds": [
+        3,
+        6
+      ]
+    }

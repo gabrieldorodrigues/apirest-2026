@@ -1,0 +1,9 @@
+$kind: http-request
+method: GET
+url: '{{baseUrl}}/albuns?artistaId=1&generoId=2'
+order: 2000
+queryParams:
+  - key: artistaId
+    value: '1'
+  - key: generoId
+    value: '2'

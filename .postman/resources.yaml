@@ -1,0 +1,7 @@
+# Use this workspace to collaborate
+workspace:
+  id: 6bacbaa8-1559-45e8-8334-d9c7afdc4ea8
+
+localResources:
+  collections:
+    - ../postman/collections/apirest-2026

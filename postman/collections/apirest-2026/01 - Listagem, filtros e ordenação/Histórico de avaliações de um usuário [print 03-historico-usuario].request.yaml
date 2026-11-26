@@ -1,0 +1,7 @@
+$kind: http-request
+method: GET
+url: '{{baseUrl}}/avaliacoes?usuarioId=1'
+order: 7000
+queryParams:
+  - key: usuarioId
+    value: '1'

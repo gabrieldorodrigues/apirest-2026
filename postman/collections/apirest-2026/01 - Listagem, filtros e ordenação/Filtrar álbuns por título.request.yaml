@@ -1,0 +1,7 @@
+$kind: http-request
+method: GET
+url: '{{baseUrl}}/albuns?titulo=blue'
+order: 3000
+queryParams:
+  - key: titulo
+    value: 'blue'

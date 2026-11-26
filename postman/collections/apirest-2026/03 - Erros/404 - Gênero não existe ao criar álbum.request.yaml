@@ -1,0 +1,18 @@
+$kind: http-request
+method: POST
+url: '{{baseUrl}}/albuns'
+order: 7000
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "titulo": "Teste",
+      "anoLancamento": 2000,
+      "artistaId": 1,
+      "generoIds": [
+        999
+      ]
+    }

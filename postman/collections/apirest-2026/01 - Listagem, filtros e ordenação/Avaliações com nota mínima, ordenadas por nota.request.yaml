@@ -1,0 +1,11 @@
+$kind: http-request
+method: GET
+url: '{{baseUrl}}/avaliacoes?notaMinima=4.5&sort=nota,desc&size=3'
+order: 6000
+queryParams:
+  - key: notaMinima
+    value: '4.5'
+  - key: sort
+    value: 'nota,desc'
+  - key: size
+    value: '3'
