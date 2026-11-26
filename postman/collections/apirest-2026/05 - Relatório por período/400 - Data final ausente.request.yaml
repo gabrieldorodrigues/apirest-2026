@@ -1,0 +1,7 @@
+$kind: http-request
+method: GET
+url: '{{baseUrl}}/relatorios/avaliacoes?inicio=2026-09-01'
+order: 8000
+queryParams:
+  - key: inicio
+    value: '2026-09-01'
