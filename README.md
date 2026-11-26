@@ -1,5 +1,7 @@
 # API de Avaliação Musical
 
+[![CI](https://github.com/gabrieldorodrigues/apirest-2026/actions/workflows/ci.yml/badge.svg)](https://github.com/gabrieldorodrigues/apirest-2026/actions/workflows/ci.yml) [![Documentação](https://github.com/gabrieldorodrigues/apirest-2026/actions/workflows/docs.yml/badge.svg)](https://github.com/gabrieldorodrigues/apirest-2026/actions/workflows/docs.yml)
+
 API REST para avaliar álbuns e músicas. O usuário registra o que ouviu, dá uma nota e escreve uma resenha. A ideia segue o modelo do Letterboxd, aplicado à música.
 
 > 📖 **Documentação completa:** [gabrieldorodrigues.github.io/apirest-2026](https://gabrieldorodrigues.github.io/apirest-2026/). Tem páginas por assunto, busca, diagramas e a galeria de evidências (veja [Documentação com MkDocs](#documentação-com-mkdocs)).
@@ -134,6 +136,7 @@ classDiagram
 - PostgreSQL 17 com o profile `postgres` (driver `org.postgresql:postgresql`)
 - Testcontainers (testes contra um PostgreSQL de verdade no Docker)
 - Docker e Docker Compose (API + PostgreSQL com um comando)
+- GitHub Actions (CI/CD) e GitHub Container Registry
 - Maven
 
 ## Como executar
@@ -260,7 +263,7 @@ src/main/java/com/example/musica
 └── service       # regras de negócio
 ```
 
-Na raiz ficam o `Dockerfile`, o `docker-compose.yml`, o `.env.example` e a configuração do Nginx em `nginx/nginx.conf` (veja [Executar com Docker](#executar-com-docker)).
+Na raiz ficam o `Dockerfile`, o `docker-compose.yml`, o `.env.example` e a configuração do Nginx em `nginx/nginx.conf` (veja [Executar com Docker](#executar-com-docker)). Os workflows do GitHub Actions ficam em `.github/workflows` (veja [CI/CD](#cicd)).
 
 ## Endpoints
 
@@ -579,6 +582,26 @@ Para rodar:
 - **Terminal:** `./mvnw test`.
 
 Evidência: [14-testes](evidencias/14-testes.png).
+
+## CI/CD
+
+> Requisito extra: **CI/CD (5%)**, issue [#16](https://github.com/gabrieldorodrigues/apirest-2026/issues/16).
+
+O workflow **CI** (`.github/workflows/ci.yml`) roda no GitHub Actions em todo pull request e em todo push na `main`:
+
+| Job | O que faz |
+| --- | --- |
+| **Testes** | `./mvnw -B verify` com Java 17. Roda todos os testes, inclusive o `PostgresIntegracaoTest`, porque o runner tem Docker para o Testcontainers. O resumo da execução mostra os testes de cada classe, e o relatório do Surefire fica salvo como artefato |
+| **Imagem Docker** | Só roda depois dos testes. Em pull request, gera a imagem para garantir que o `Dockerfile` funciona. Na `main`, também publica em `ghcr.io/gabrieldorodrigues/apirest-2026` com as tags `latest` e o SHA do commit |
+
+A `main` exige o check **Testes** verde para aceitar o merge. A documentação continua sendo publicada pelo workflow `docs.yml` (veja [Documentação com MkDocs](#documentação-com-mkdocs)).
+
+Para rodar a versão publicada da `main`, sem compilar, com o load balancer e o PostgreSQL:
+
+```bash
+API_IMAGE=ghcr.io/gabrieldorodrigues/apirest-2026 docker compose pull api
+API_IMAGE=ghcr.io/gabrieldorodrigues/apirest-2026 docker compose up --no-build
+```
 
 ## Documentação com MkDocs
 

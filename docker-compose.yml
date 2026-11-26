@@ -25,7 +25,8 @@ services:
 
   api:
     build: .
-    image: apirest-2026-musica
+    # imagem gerada pelo build; com API_IMAGE=ghcr.io/gabrieldorodrigues/apirest-2026 usa a publicada pelo CI
+    image: ${API_IMAGE:-apirest-2026-musica}
     # várias réplicas: sem container_name e sem porta publicada; só o lb fica exposto
     deploy:
       replicas: ${API_REPLICAS:-3}

@@ -113,6 +113,7 @@ nav:
       - PostgreSQL: extras/postgresql.md
       - Docker/Compose: extras/docker.md
       - Load balancer: extras/load-balancer.md
+      - CI/CD: extras/ci-cd.md
   - Evidências: evidencias.md
   - Projeto:
       - Enunciado: enunciado-projeto-final.md
