@@ -4,9 +4,15 @@ import java.math.BigDecimal;
 import java.util.HashSet;
 import java.util.Set;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.jdbc.core.ConnectionCallback;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import com.example.musica.model.Album;
 import com.example.musica.model.Artista;
@@ -24,15 +30,26 @@ import com.example.musica.repository.UsuarioRepository;
 @Configuration
 public class SeedConfig {
 
+    private static final Logger log = LoggerFactory.getLogger(SeedConfig.class);
+
+    // número qualquer, só precisa ser o mesmo em todas as instâncias
+    private static final long LOCK_SEED = 2026_11_19L;
+
     @Bean
     CommandLineRunner seed(ArtistaRepository artistaRepository, GeneroRepository generoRepository,
             AlbumRepository albumRepository, MusicaRepository musicaRepository,
-            UsuarioRepository usuarioRepository, AvaliacaoRepository avaliacaoRepository) {
-        return args -> {
-            // o banco é em arquivo, então só popula na primeira vez
+            UsuarioRepository usuarioRepository, AvaliacaoRepository avaliacaoRepository,
+            PlatformTransactionManager transactionManager, JdbcTemplate jdbcTemplate) {
+        return args -> new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+            // com várias instâncias subindo juntas, só uma popula o banco; as outras esperam o lock e
+            // depois encontram os dados já gravados
+            travarSeedNoPostgres(jdbcTemplate);
+
+            // o banco é persistente, então só popula na primeira vez
             if (artistaRepository.count() > 0) {
                 return;
             }
+            log.info("Banco vazio: gravando os dados de exemplo");
 
             Genero rock = generoRepository.save(new Genero("Rock"));
             Genero alternativo = generoRepository.save(new Genero("Alternativo"));
@@ -73,7 +90,16 @@ public class SeedConfig {
             avaliacaoRepository.save(avaliacao(joao, null, reckoner, "4.5", null));
             avaliacaoRepository.save(avaliacao(ana, null, tropicaliaMusica, "4.0", null));
             avaliacaoRepository.save(avaliacao(joao, null, soWhat, "3.5", "Bom, mas longo."));
-        };
+        });
+    }
+
+    // lock de transação do PostgreSQL: é liberado sozinho no commit; o H2 roda numa instância só e não precisa
+    private void travarSeedNoPostgres(JdbcTemplate jdbcTemplate) {
+        String banco = jdbcTemplate.execute(
+                (ConnectionCallback<String>) conexao -> conexao.getMetaData().getDatabaseProductName());
+        if ("PostgreSQL".equals(banco)) {
+            jdbcTemplate.queryForObject("select pg_advisory_xact_lock(?)::text", String.class, LOCK_SEED);
+        }
     }
 
     private Album album(String titulo, int ano, Artista artista, Set<Genero> generos) {

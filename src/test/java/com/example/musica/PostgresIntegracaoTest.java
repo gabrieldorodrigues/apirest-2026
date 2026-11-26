@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -40,6 +41,18 @@ class PostgresIntegracaoTest {
 
     @Autowired
     private MockMvc mockMvc;
+
+    @Autowired
+    private CommandLineRunner seed;
+
+    @Test
+    @DisplayName("Seed com lock no PostgreSQL: rodar de novo (como outra instância subindo) não duplica os dados")
+    void seedNaoDuplica() throws Exception {
+        seed.run();
+
+        mockMvc.perform(get("/artistas")).andExpect(jsonPath("$.page.totalElements").value(4));
+        mockMvc.perform(get("/avaliacoes")).andExpect(jsonPath("$.page.totalElements").value(9));
+    }
 
     @Test
     @DisplayName("Health check mostra o banco como PostgreSQL")

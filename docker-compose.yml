@@ -1,4 +1,7 @@
-# Sobe a API de Avaliação Musical com PostgreSQL: docker compose up --build
+# Sobe a API de Avaliação Musical com PostgreSQL e load balancer: docker compose up --build
+#
+#   cliente -> lb (Nginx, porta 8080) -> api (3 réplicas) -> db (PostgreSQL)
+#
 # Os valores abaixo têm padrão; para trocar, crie um arquivo .env (veja o .env.example)
 services:
   db:
@@ -23,21 +26,45 @@ services:
   api:
     build: .
     image: apirest-2026-musica
-    container_name: musica-api
+    # várias réplicas: sem container_name e sem porta publicada; só o lb fica exposto
+    deploy:
+      replicas: ${API_REPLICAS:-3}
     environment:
       SPRING_PROFILES_ACTIVE: postgres
       DB_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-musica}
       DB_USER: ${POSTGRES_USER:-musica}
       DB_PASSWORD: ${POSTGRES_PASSWORD:-musica}
+      # um arquivo de log por réplica ($$ = o Spring resolve o HOSTNAME de dentro do container)
+      LOGGING_FILE_NAME: logs/musica-$${HOSTNAME}.log
       # mesmo fuso da máquina de desenvolvimento: vale para os logs e para criadaEm/atualizadaEm
       TZ: America/Sao_Paulo
-    ports:
-      - "${API_PORT:-8080}:8080"
+    expose:
+      - "8080"
     volumes:
       - musica-logs:/app/logs
     # só sobe a API depois que o PostgreSQL aceita conexões
     depends_on:
       db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  lb:
+    image: nginx:1.28-alpine
+    container_name: musica-lb
+    ports:
+      - "${API_PORT:-8080}:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    environment:
+      TZ: America/Sao_Paulo
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/nginx-health || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    # só começa a distribuir tráfego quando as réplicas da API estão healthy
+    depends_on:
+      api:
         condition: service_healthy
     restart: unless-stopped
 
