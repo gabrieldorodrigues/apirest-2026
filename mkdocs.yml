@@ -108,6 +108,7 @@ nav:
       - Paginação, filtros e ordenação: api/listagens.md
       - Validação e erros: api/erros.md
       - Swagger UI: /apirest-2026/swagger/
+  - Carta-desafio: carta-desafio.md
   - Requisitos extras:
       - extras/index.md
       - Testes automatizados: extras/testes.md

@@ -69,6 +69,7 @@ public class AvaliacaoService {
         Avaliacao avaliacao = new Avaliacao();
         copiar(dto, avaliacao);
         Avaliacao salva = avaliacaoRepository.save(avaliacao);
+        invalidarCacheDoAlbum(salva);
 
         String tipo = salva.getAlbum() != null ? "album" : "musica";
         Counter.builder("musica.avaliacoes.criadas")
@@ -85,7 +86,10 @@ public class AvaliacaoService {
     public AvaliacaoResponseDto atualizar(Long id, AvaliacaoRequestDto dto) {
         Avaliacao avaliacao = buscarEntidade(id);
         validarRegras(dto, id);
+        // a avaliação pode ter trocado de álbum (ou de álbum para música): a média do álbum antigo também muda
+        invalidarCacheDoAlbum(avaliacao);
         copiar(dto, avaliacao);
+        invalidarCacheDoAlbum(avaliacao);
         // flush força o @PreUpdate a rodar agora, senão a resposta voltaria com o atualizadaEm antigo
         AvaliacaoResponseDto resposta = avaliacaoMapper.toDto(avaliacaoRepository.saveAndFlush(avaliacao));
         log.info("Avaliação {} atualizada: nota {}", id, dto.nota());
@@ -94,8 +98,17 @@ public class AvaliacaoService {
 
     @Transactional
     public void remover(Long id) {
-        avaliacaoRepository.delete(buscarEntidade(id));
+        Avaliacao avaliacao = buscarEntidade(id);
+        avaliacaoRepository.delete(avaliacao);
+        invalidarCacheDoAlbum(avaliacao);
         log.info("Avaliação {} removida", id);
+    }
+
+    // a nota média do álbum muda; avaliação de música não entra na média do álbum
+    private void invalidarCacheDoAlbum(Avaliacao avaliacao) {
+        if (avaliacao.getAlbum() != null) {
+            albumService.invalidarCache(avaliacao.getAlbum().getId());
+        }
     }
 
     private Avaliacao buscarEntidade(Long id) {

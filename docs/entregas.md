@@ -13,7 +13,7 @@
 | Bloco | Peso | Onde está |
 | --- | --- | --- |
 | API base | 40% | [Domínio](dominio.md), [API](api/index.md) e [Evidências](evidencias.md) |
-| Carta-desafio | 40% | Implementada na E3; veja o [catálogo de cartas](cartas-desafio.md) |
+| Carta-desafio | 40% | Carta 5, [cache de consultas frequentes](carta-desafio.md). Veja também o [catálogo de cartas](cartas-desafio.md) |
 | Requisitos extras | 20% | [Requisitos extras](extras/index.md) |
 
 ## Mudanças no modelo

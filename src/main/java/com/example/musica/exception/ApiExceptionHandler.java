@@ -12,6 +12,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
@@ -68,6 +69,12 @@ public class ApiExceptionHandler {
     public ProblemDetail parametroInvalido(MethodArgumentTypeMismatchException ex) {
         return problema(HttpStatus.BAD_REQUEST, "Parâmetro inválido",
                 "O valor '" + ex.getValue() + "' não é válido para o parâmetro " + ex.getName());
+    }
+
+    // sem este handler, um @RequestParam obrigatório ausente cairia no erro interno (500)
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ProblemDetail parametroAusente(MissingServletRequestParameterException ex) {
+        return problema(HttpStatus.BAD_REQUEST, "Parâmetro obrigatório", "O parâmetro " + ex.getParameterName() + " é obrigatório");
     }
 
     // acontece quando o cliente manda ?sort= com um campo que não existe na entidade

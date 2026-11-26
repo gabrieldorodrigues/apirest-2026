@@ -1,6 +1,7 @@
 # Sobe a API de Avaliação Musical com PostgreSQL e load balancer: docker compose up --build
 #
 #   cliente -> lb (Nginx, porta 8080) -> api (3 réplicas) -> db (PostgreSQL)
+#                                                    \-> redis (cache dos álbuns)
 #
 # Os valores abaixo têm padrão; para trocar, crie um arquivo .env (veja o .env.example)
 services:
@@ -23,6 +24,19 @@ services:
       retries: 10
     restart: unless-stopped
 
+  # cache dos álbuns, compartilhado pelas réplicas: a invalidação feita numa instância vale para todas
+  redis:
+    image: redis:8-alpine
+    container_name: musica-redis
+    environment:
+      TZ: America/Sao_Paulo
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
   api:
     build: .
     # imagem gerada pelo build; com API_IMAGE=ghcr.io/gabrieldorodrigues/apirest-2026 usa a publicada pelo CI
@@ -35,6 +49,9 @@ services:
       DB_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-musica}
       DB_USER: ${POSTGRES_USER:-musica}
       DB_PASSWORD: ${POSTGRES_PASSWORD:-musica}
+      CACHE_TYPE: redis
+      REDIS_HOST: redis
+      CACHE_TTL: ${CACHE_TTL:-10m}
       # um arquivo de log por réplica ($$ = o Spring resolve o HOSTNAME de dentro do container)
       LOGGING_FILE_NAME: logs/musica-$${HOSTNAME}.log
       # mesmo fuso da máquina de desenvolvimento: vale para os logs e para criadaEm/atualizadaEm
@@ -43,9 +60,11 @@ services:
       - "8080"
     volumes:
       - musica-logs:/app/logs
-    # só sobe a API depois que o PostgreSQL aceita conexões
+    # só sobe a API depois que o PostgreSQL e o Redis aceitam conexões
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     restart: unless-stopped
 

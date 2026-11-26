@@ -1,10 +1,12 @@
 package com.example.musica.service;
 
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.example.musica.config.CacheConfig;
 import com.example.musica.dto.ArtistaRequestDto;
 import com.example.musica.dto.ArtistaResponseDto;
 import com.example.musica.exception.ConflitoException;
@@ -46,6 +48,8 @@ public class ArtistaService {
         return artistaMapper.toDto(artistaRepository.save(artista));
     }
 
+    // o nome do artista vai dentro da resposta de cada álbum, então todos os álbuns em cache ficam velhos
+    @CacheEvict(cacheNames = { CacheConfig.ALBUM, CacheConfig.ALBUNS }, allEntries = true)
     @Transactional
     public ArtistaResponseDto atualizar(Long id, ArtistaRequestDto dto) {
         Artista artista = buscarEntidade(id);

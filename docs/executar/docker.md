@@ -29,6 +29,7 @@ musica-lb            nginx:1.28-alpine     lb        Up (healthy)              0
 | `lb` (`musica-lb`) | Nginx na porta 8080: distribui as requisições entre as instâncias da API |
 | `api` (3 réplicas) | A API com o profile `postgres`. Não publica porta; só o `lb` fica exposto |
 | `db` (`musica-db`) | PostgreSQL 17 com os dados no volume `musica-pgdata` |
+| `redis` (`musica-redis`) | Redis 8, o cache dos álbuns, compartilhado pelas réplicas (veja [Carta-desafio](../carta-desafio.md)) |
 
 Como isso funciona por dentro está em [Docker/Compose](../extras/docker.md) e [Load balancer](../extras/load-balancer.md).
 

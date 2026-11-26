@@ -45,7 +45,7 @@ src/main/java/com/example/musica
 
 ## Infraestrutura com Docker
 
-Com `docker compose up --build`, o projeto sobe com PostgreSQL, três instâncias da API e um Nginx na frente:
+Com `docker compose up --build`, o projeto sobe com PostgreSQL, Redis, três instâncias da API e um Nginx na frente:
 
 ```mermaid
 flowchart LR
@@ -56,6 +56,7 @@ flowchart LR
     A1 --> DB[(db<br/>PostgreSQL 17)]
     A2 --> DB
     A3 --> DB
+    A1 & A2 & A3 --> R[(redis<br/>Redis 8<br/>cache dos álbuns)]
     DB --- V1[/volume musica-pgdata/]
     A1 & A2 & A3 --- V2[/volume musica-logs/]
 ```
@@ -65,7 +66,8 @@ flowchart LR
 | `lb` | `nginx:1.28-alpine` | 8080 | Único ponto de entrada; distribui as requisições e tira do rodízio as instâncias que falham. |
 | `api` (×3) | construída pelo `Dockerfile` | nenhuma | A API com o profile `postgres`. Não guarda estado em memória, então qualquer instância atende qualquer requisição. |
 | `db` | `postgres:17-alpine` | 5432 | Banco compartilhado pelas instâncias, com os dados num volume persistente. |
+| `redis` | `redis:8-alpine` | nenhuma | Cache dos álbuns, compartilhado pelas instâncias (veja [Carta-desafio](carta-desafio.md)). |
 
-A ordem de subida é garantida por health checks: o `db` precisa estar pronto (`pg_isready`) para a `api` subir, e as réplicas da `api` precisam estar `healthy` (`/actuator/health`) para o `lb` subir.
+A ordem de subida é garantida por health checks: o `db` (`pg_isready`) e o `redis` (`redis-cli ping`) precisam estar prontos para a `api` subir, e as réplicas da `api` precisam estar `healthy` (`/actuator/health`) para o `lb` subir.
 
 Os detalhes estão em [Docker/Compose](extras/docker.md) e [Load balancer](extras/load-balancer.md).
