@@ -18,7 +18,7 @@ Projeto final da disciplina de API REST · Tema **Entretenimento e Cultura**.
 
     ---
 
-    30 endpoints REST com paginação, filtros, ordenação e erros em Problem Details.
+    31 endpoints REST com paginação, filtros, ordenação e erros em Problem Details.
 
     [:octicons-arrow-right-24: Endpoints](api/endpoints.md)
 
@@ -29,6 +29,14 @@ Projeto final da disciplina de API REST · Tema **Entretenimento e Cultura**.
     Artistas, álbuns, músicas, gêneros, usuários e avaliações, com regras e diagrama UML.
 
     [:octicons-arrow-right-24: Domínio](dominio.md)
+
+-   :material-chart-bar: **Carta-desafio**
+
+    ---
+
+    Relatório das avaliações de um período: totais, nota média, gêneros, álbuns e músicas mais avaliados.
+
+    [:octicons-arrow-right-24: Relatório por período](carta-desafio.md)
 
 -   :material-star-plus: **Requisitos extras**
 

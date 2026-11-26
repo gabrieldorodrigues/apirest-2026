@@ -11,6 +11,8 @@ A API segue o estilo REST: cada entidade é um recurso com CRUD completo, as res
 | `/usuarios` | Pessoas que avaliam álbuns e músicas |
 | `/avaliacoes` | Nota e resenha de um usuário sobre um álbum ou uma música |
 
+Além dos recursos, a API tem o relatório `GET /relatorios/avaliacoes`, com os totais das avaliações de um período (veja [Carta-desafio](../carta-desafio.md)).
+
 ## Operações
 
 Todos os recursos têm as mesmas cinco operações:

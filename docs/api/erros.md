@@ -8,10 +8,10 @@ Todos os erros passam pelo `ApiExceptionHandler` e voltam no formato **Problem D
 
 | Código | Título | Quando acontece |
 | --- | --- | --- |
-| **400** | Erro de validação · JSON inválido · Parâmetro inválido · Ordenação inválida | Campo obrigatório vazio, formato inválido, nota fora de 0,5 a 5, JSON mal formatado ou com tipo errado, id inválido na rota, campo de `sort` inexistente |
+| **400** | Erro de validação · JSON inválido · Parâmetro inválido · Parâmetro obrigatório · Ordenação inválida | Campo obrigatório vazio, formato inválido, nota fora de 0,5 a 5, JSON mal formatado ou com tipo errado, id inválido na rota, data inválida no relatório, parâmetro obrigatório ausente, campo de `sort` inexistente |
 | **404** | Recurso não encontrado · Rota não encontrada | O recurso não existe, inclusive ids informados no corpo (`artistaId`, `generoIds`, `usuarioId`...) |
 | **409** | Conflito | E-mail repetido, gênero repetido, faixa repetida no álbum, usuário avaliando o mesmo álbum/música duas vezes, remoção de registro que tem dependentes |
-| **422** | Regra de negócio violada | Avaliação com álbum e música ao mesmo tempo (ou sem nenhum dos dois), nota fora do passo de 0,5 |
+| **422** | Regra de negócio violada | Avaliação com álbum e música ao mesmo tempo (ou sem nenhum dos dois), nota fora do passo de 0,5, relatório com data inicial depois da final ou período maior que 1 ano |
 | **500** | Erro interno | Erro inesperado. A mensagem não expõe detalhes internos; o stack trace vai só para o log |
 
 ## Exemplos
